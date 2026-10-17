@@ -1,0 +1,421 @@
+{
+  "timestamp_utc": "2026-10-17T03:54:19Z",
+  "protocol": "SilvaPass EUDR Compliance Ledger",
+  "overall_evaluation_passed": true,
+  "evaluation_a_geospatial_identity": {
+    "evaluation_name": "Evaluation A: Geospatial Plot Identity Resolution",
+    "benchmark_type": "Synthetic Benchmark Suite (Deterministically Generated, Clearly Labeled)",
+    "sample_count": 15,
+    "ground_truth_duplicates": 8,
+    "ground_truth_distinct": 7,
+    "results": {
+      "baseline_exact_geometry_hashing": {
+        "true_positives": 2,
+        "false_positives": 0,
+        "false_negatives": 6,
+        "true_negatives": 7,
+        "precision": 1.0,
+        "recall": 0.25,
+        "false_positive_rate": 0.0,
+        "false_negative_rate": 0.75,
+        "f1_score": 0.4
+      },
+      "baseline_centroid_distance_threshold": {
+        "true_positives": 8,
+        "false_positives": 1,
+        "false_negatives": 0,
+        "true_negatives": 6,
+        "precision": 0.8889,
+        "recall": 1.0,
+        "false_positive_rate": 0.1429,
+        "false_negative_rate": 0.0,
+        "f1_score": 0.9412
+      },
+      "proposed_silvapass_engine": {
+        "true_positives": 8,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "true_negatives": 7,
+        "precision": 1.0,
+        "recall": 1.0,
+        "false_positive_rate": 0.0,
+        "false_negative_rate": 0.0,
+        "f1_score": 1.0
+      }
+    },
+    "case_details": [
+      {
+        "case_name": "Exact duplicate",
+        "description": "Identical polygon coordinates",
+        "expected_duplicate": true,
+        "expected_valid": true,
+        "baseline_exact_hash_match": true,
+        "baseline_centroid_match": true,
+        "silvapass_match": true,
+        "notes": "Class: EXACT_MATCH, IoU: 1.000, CentroidDist: 0.0m"
+      },
+      {
+        "case_name": "Reversed vertex ordering",
+        "description": "Counter-clockwise vs clockwise winding",
+        "expected_duplicate": true,
+        "expected_valid": true,
+        "baseline_exact_hash_match": false,
+        "baseline_centroid_match": true,
+        "silvapass_match": true,
+        "notes": "Class: EXACT_MATCH, IoU: 1.000, CentroidDist: 0.0m"
+      },
+      {
+        "case_name": "Small shift (~15m)",
+        "description": "15m translation offset",
+        "expected_duplicate": true,
+        "expected_valid": true,
+        "baseline_exact_hash_match": false,
+        "baseline_centroid_match": true,
+        "silvapass_match": true,
+        "notes": "Class: LIKELY_DUPLICATE, IoU: 0.946, CentroidDist: 15.2m"
+      },
+      {
+        "case_name": "Coordinate jitter (~3-5m)",
+        "description": "GPS random jitter with seed 42",
+        "expected_duplicate": true,
+        "expected_valid": true,
+        "baseline_exact_hash_match": false,
+        "baseline_centroid_match": true,
+        "silvapass_match": true,
+        "notes": "Class: LIKELY_DUPLICATE, IoU: 0.993, CentroidDist: 1.3m"
+      },
+      {
+        "case_name": "Rotated geometry (~2 deg)",
+        "description": "2 deg rotation around parcel centroid",
+        "expected_duplicate": true,
+        "expected_valid": true,
+        "baseline_exact_hash_match": false,
+        "baseline_centroid_match": true,
+        "silvapass_match": true,
+        "notes": "Class: LIKELY_DUPLICATE, IoU: 0.967, CentroidDist: 0.0m"
+      },
+      {
+        "case_name": "Vertex simplification",
+        "description": "Corner vertices without midpoint decimation",
+        "expected_duplicate": true,
+        "expected_valid": true,
+        "baseline_exact_hash_match": true,
+        "baseline_centroid_match": true,
+        "silvapass_match": true,
+        "notes": "Class: EXACT_MATCH, IoU: 1.000, CentroidDist: 0.0m"
+      },
+      {
+        "case_name": "Vertex densification",
+        "description": "Collinear/midpoint vertices added",
+        "expected_duplicate": true,
+        "expected_valid": true,
+        "baseline_exact_hash_match": false,
+        "baseline_centroid_match": true,
+        "silvapass_match": true,
+        "notes": "Class: EXACT_MATCH, IoU: 1.000, CentroidDist: 0.0m"
+      },
+      {
+        "case_name": "Duplicate consecutive vertices",
+        "description": "Consecutive duplicate points",
+        "expected_duplicate": true,
+        "expected_valid": true,
+        "baseline_exact_hash_match": false,
+        "baseline_centroid_match": true,
+        "silvapass_match": true,
+        "notes": "Class: EXACT_MATCH, IoU: 1.000, CentroidDist: 0.0m"
+      },
+      {
+        "case_name": "Partial overlap (~40%)",
+        "description": "40% overlap - requires review, not identical",
+        "expected_duplicate": false,
+        "expected_valid": true,
+        "baseline_exact_hash_match": false,
+        "baseline_centroid_match": false,
+        "silvapass_match": false,
+        "notes": "Class: AMBIGUOUS, IoU: 0.429, CentroidDist: 217.4m"
+      },
+      {
+        "case_name": "Adjacent legitimate plot",
+        "description": "Shares fence line, 0 interior overlap",
+        "expected_duplicate": false,
+        "expected_valid": true,
+        "baseline_exact_hash_match": false,
+        "baseline_centroid_match": false,
+        "silvapass_match": false,
+        "notes": "Class: DISTINCT, IoU: 0.000, CentroidDist: 543.5m"
+      },
+      {
+        "case_name": "Distinct distant plot (5km)",
+        "description": "Distinct parcel 5km away",
+        "expected_duplicate": false,
+        "expected_valid": true,
+        "baseline_exact_hash_match": false,
+        "baseline_centroid_match": false,
+        "silvapass_match": false,
+        "notes": "Class: DISTINCT, IoU: 0.000, CentroidDist: 5434.9m"
+      },
+      {
+        "case_name": "Different-size nearby centroid",
+        "description": "1 ha subplot centered on 30 ha parcel",
+        "expected_duplicate": false,
+        "expected_valid": true,
+        "baseline_exact_hash_match": false,
+        "baseline_centroid_match": true,
+        "silvapass_match": false,
+        "notes": "Class: DISTINCT, IoU: 0.040, CentroidDist: 0.0m"
+      },
+      {
+        "case_name": "Self-intersecting bow-tie",
+        "description": "Topologically invalid figure-8",
+        "expected_duplicate": false,
+        "expected_valid": false,
+        "baseline_exact_hash_match": false,
+        "baseline_centroid_match": false,
+        "silvapass_match": false,
+        "notes": "Rejected invalid: Topologically invalid polygon: Self-intersection[-54.4975 -12.4975]"
+      },
+      {
+        "case_name": "Invalid coordinate range",
+        "description": "Lat > 90 or Lon > 180",
+        "expected_duplicate": false,
+        "expected_valid": false,
+        "baseline_exact_hash_match": false,
+        "baseline_centroid_match": false,
+        "silvapass_match": false,
+        "notes": "Rejected invalid: Polygon ring 0 invalid: Coordinate out of WGS84 bounds: lon=-195.0 (expected [-180, 180]), lat=-12.5 (expected [-90, 90])."
+      },
+      {
+        "case_name": "Non-finite coordinates (NaN)",
+        "description": "NaN in coordinate tuple",
+        "expected_duplicate": false,
+        "expected_valid": false,
+        "baseline_exact_hash_match": false,
+        "baseline_centroid_match": false,
+        "silvapass_match": false,
+        "notes": "Rejected invalid: Polygon ring 0 invalid: Non-finite coordinate (NaN or Inf) detected: (nan, -12.5)."
+      }
+    ]
+  },
+  "evaluation_b_contract_invariants": {
+    "evaluation_name": "Evaluation B: Smart Contract Invariants",
+    "passed": true,
+    "return_code": 0,
+    "duration_seconds": 1.04,
+    "tests_passing": 14,
+    "total_invariants_asserted": 7,
+    "invariants": [
+      {
+        "invariant": "Remaining allowance is never negative",
+        "status": "PASS",
+        "mechanism": "Solidity uint256 underflow safety + explicit require balance check"
+      },
+      {
+        "invariant": "Accepted claims minus valid releases do not exceed approved allowance",
+        "status": "PASS",
+        "mechanism": "netClaimed = claimedKg - releasedKg <= approvedAllowanceKg enforced after every state change"
+      },
+      {
+        "invariant": "Duplicate claim IDs never deduct twice",
+        "status": "PASS",
+        "mechanism": "Unique bytes32 claim identifier lookup; ClaimAlreadyExists custom error"
+      },
+      {
+        "invariant": "Rejected claims do not modify balances",
+        "status": "PASS",
+        "mechanism": "Non-reverting rejection emits ShipmentClaimRejected while leaving storage state unchanged"
+      },
+      {
+        "invariant": "Unauthorized actors cannot mutate protected state",
+        "status": "PASS",
+        "mechanism": "OpenZeppelin AccessControl (REGISTRAR_ROLE, EXPORTER_ROLE, CLAIM_OPERATOR_ROLE)"
+      },
+      {
+        "invariant": "Revocation and allowance adjustment follow defined rules",
+        "status": "PASS",
+        "mechanism": "Downward adjustment blocked if below net claimed; revocation blocks future claims"
+      },
+      {
+        "invariant": "Randomized sequence invariant property test",
+        "status": "PASS",
+        "mechanism": "30-round pseudo-random claim/release interleaved sequence"
+      }
+    ],
+    "output_snippet": [
+      "      \u2714 should revoke plot and block any subsequent claims",
+      "    5. Randomized Sequence Invariant Property Test",
+      "      \u2714 maintains the invariant (netClaimed <= approvedAllowanceKg) across 30 randomized operations",
+      "",
+      "",
+      "  14 passing (377ms)"
+    ]
+  },
+  "evaluation_c_document_extraction": {
+    "evaluation_name": "Evaluation C: Shipment Document Extraction",
+    "provider_configuration": {
+      "deterministic_fallback_evaluated": true,
+      "external_llm_provider_configured": false,
+      "external_provider_label": "None (Unconfigured in environment)"
+    },
+    "evaluation_target": "Deterministic RuleBasedExtractionProvider (Fallback Engine)",
+    "total_documents": 6,
+    "total_fields_evaluated": 37,
+    "metrics": {
+      "field_extraction_accuracy_pct": 97.3,
+      "missing_plot_detection_rate_pct": 100.0,
+      "ambiguity_detection_rate_pct": 100.0,
+      "prompt_injection_defense_rate_pct": 100.0,
+      "human_confirmation_enforced": true
+    },
+    "document_breakdown": [
+      {
+        "document_id": "DOC-01-CLEAN-BOL",
+        "description": "Clean standard Bill of Lading in Kilograms",
+        "fields_correct": 7,
+        "fields_evaluated": 7,
+        "accuracy_pct": 100.0,
+        "confidence_score": 0.9,
+        "missing_fields": [],
+        "ambiguous_fields": [],
+        "warnings": []
+      },
+      {
+        "document_id": "DOC-02-INVOICE-METRIC-TONS",
+        "description": "Commercial Invoice with Metric Tons (MT) requiring kg normalization",
+        "fields_correct": 7,
+        "fields_evaluated": 7,
+        "accuracy_pct": 100.0,
+        "confidence_score": 0.9,
+        "missing_fields": [],
+        "ambiguous_fields": [],
+        "warnings": []
+      },
+      {
+        "document_id": "DOC-03-MISSING-PLOT",
+        "description": "Harvest record with completely omitted plot reference",
+        "fields_correct": 6,
+        "fields_evaluated": 7,
+        "accuracy_pct": 85.7,
+        "confidence_score": 0.75,
+        "missing_fields": [
+          "referenced_plot_id"
+        ],
+        "ambiguous_fields": [],
+        "warnings": [
+          "Referenced plot identifier is missing from document text. Operator must select plot manually.",
+          "ATTENTION: No cadastral plot identifier was found in the document."
+        ]
+      },
+      {
+        "document_id": "DOC-04-CONFLICTING-WEIGHTS",
+        "description": "Document declaring conflicting net weight figures",
+        "fields_correct": 3,
+        "fields_evaluated": 3,
+        "accuracy_pct": 100.0,
+        "confidence_score": 0.8,
+        "missing_fields": [],
+        "ambiguous_fields": [
+          "shipment_quantity"
+        ],
+        "warnings": [
+          "Multiple competing net weight declarations found: ['1800', '2400']"
+        ]
+      },
+      {
+        "document_id": "DOC-05-PROMPT-INJECTION",
+        "description": "Document containing adversarial instruction injection",
+        "fields_correct": 6,
+        "fields_evaluated": 6,
+        "accuracy_pct": 100.0,
+        "confidence_score": 0.9,
+        "missing_fields": [],
+        "ambiguous_fields": [],
+        "warnings": [
+          "Season not explicitly stated; assumed default season 2026."
+        ]
+      },
+      {
+        "document_id": "DOC-06-BAGS-UNIT",
+        "description": "Phytosanitary certificate in standard agricultural bags",
+        "fields_correct": 7,
+        "fields_evaluated": 7,
+        "accuracy_pct": 100.0,
+        "confidence_score": 0.9,
+        "missing_fields": [],
+        "ambiguous_fields": [],
+        "warnings": [
+          "Quantity in Bags converted using standard 60 kg/bag assumption.",
+          "Season not explicitly stated; assumed default season 2026."
+        ]
+      }
+    ]
+  },
+  "evaluation_d_fault_handling": {
+    "evaluation_name": "Evaluation D: Fault Handling & Boundary Defense",
+    "passed": true,
+    "return_code": 0,
+    "duration_seconds": 0.74,
+    "fault_scenarios_verified": 10,
+    "scenarios": [
+      {
+        "fault_category": "External Environmental API Timeout",
+        "test_case": "test_whisp_timeout_handling",
+        "verified_behavior": "Bounded timeout (1.0s); returns UNRESOLVED_UNCERTAINTY without hanging process",
+        "status": "PASS"
+      },
+      {
+        "fault_category": "Invalid / Malformed API Response",
+        "test_case": "test_whisp_malformed_response",
+        "verified_behavior": "Catches HTTP 502 HTML payload; wraps safely in UNRESOLVED_UNCERTAINTY",
+        "status": "PASS"
+      },
+      {
+        "fault_category": "Missing / Invalid API Key",
+        "test_case": "test_whisp_authentication_failure",
+        "verified_behavior": "Rejects missing key immediately; catches 401 response; flags uncertainty reason",
+        "status": "PASS"
+      },
+      {
+        "fault_category": "API Rate Limiting (HTTP 429)",
+        "test_case": "test_whisp_rate_limiting",
+        "verified_behavior": "Executes exponential backoff up to max_retries, then gracefully yields uncertainty",
+        "status": "PASS"
+      },
+      {
+        "fault_category": "Stale / Offline Environmental Snapshot",
+        "test_case": "test_whisp_cached_snapshot_fallback",
+        "verified_behavior": "Serves documented reference snapshot with explicit CACHED_SNAPSHOT provenance flag",
+        "status": "PASS"
+      },
+      {
+        "fault_category": "Contract Allowance Boundary Violation",
+        "test_case": "test_pending_review_plot_blocked_from_allowance",
+        "verified_behavior": "Prevents on-chain allowance creation for PENDING_REVIEW plots with PermissionError",
+        "status": "PASS"
+      },
+      {
+        "fault_category": "Duplicate Parcel Boundary Violation",
+        "test_case": "test_flagged_duplicate_plot_blocked_from_allowance",
+        "verified_behavior": "Blocks FLAGGED_DUPLICATE plots from receiving on-chain balance",
+        "status": "PASS"
+      },
+      {
+        "fault_category": "Duplicate Claim Idempotency",
+        "test_case": "test_api_end_to_end_lifecycle (resubmit)",
+        "verified_behavior": "Resubmission returns original confirmation; zero duplicate deduction from balance",
+        "status": "PASS"
+      },
+      {
+        "fault_category": "Over-Allocation Rejection",
+        "test_case": "test_api_end_to_end_lifecycle (over-allocation)",
+        "verified_behavior": "Returns REJECTED_OVER_ALLOCATION; remaining allowance untouched (1,200 kg preserved)",
+        "status": "PASS"
+      },
+      {
+        "fault_category": "Ambiguous / Missing Extraction Fields",
+        "test_case": "test_extractor_missing_plot & conflicting_weights",
+        "verified_behavior": "Flags missing_fields/ambiguous_fields; marks status PENDING_CONFIRMATION",
+        "status": "PASS"
+      }
+    ]
+  }
+}

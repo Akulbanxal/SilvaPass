@@ -1,0 +1,23 @@
+{
+  "name": "silvapass-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Root workspace tasks for SilvaPass",
+  "scripts": {
+    "test:contracts": "npm run --prefix contracts test",
+    "test:backend": "source .venv/bin/activate && PYTHONPATH=. pytest backend/tests",
+    "test:frontend": "npm run --prefix frontend test",
+    "test": "npm run test:contracts && npm run test:backend && npm run test:frontend",
+    "build:frontend": "npm run --prefix frontend build",
+    "compile:contracts": "npm run --prefix contracts compile",
+    "lint:frontend": "npm run --prefix frontend lint",
+    "start:backend": "source .venv/bin/activate && python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload",
+    "start:frontend": "npm run --prefix frontend dev",
+    "node:contracts": "npm run --prefix contracts node",
+    "test:whisp:live": "source .venv/bin/activate && PYTHONPATH=. python backend/environmental/verify_live_whisp.py",
+    "evaluate:extractor": "source .venv/bin/activate && PYTHONPATH=. python backend/documents/run_evaluation.py",
+    "evaluate": "source .venv/bin/activate && PYTHONPATH=. python scripts/run_evaluation_suite.py",
+    "seed:demo": "source .venv/bin/activate && PYTHONPATH=. python scripts/seed_demo_scenario.py",
+    "seed:demo:reset": "source .venv/bin/activate && PYTHONPATH=. python scripts/seed_demo_scenario.py --reset"
+  }
+}
