@@ -3,7 +3,7 @@ export type MatchClassification = "EXACT_MATCH" | "LIKELY_DUPLICATE" | "AMBIGUOU
 export type ReviewStatus = "PENDING" | "CONFIRMED_DUPLICATE" | "APPROVED_SEPARATE_PARCEL";
 export type ProvenanceType = "MEASURED" | "EXTERNAL_VERIFIED" | "CACHED_SNAPSHOT" | "SIMULATED" | "UNRESOLVED_UNCERTAINTY";
 export type DeforestationRisk = "LOW_RISK" | "HIGH_RISK" | "MORE_INFO_NEEDED" | "UNAVAILABLE";
-export type ClaimOnChainStatus = "PENDING" | "CONFIRMED" | "REJECTED_OVER_ALLOCATION" | "FAILED" | "UNKNOWN";
+export type ClaimOnChainStatus = "PENDING" | "CONFIRMED" | "RELEASED" | "REJECTED_OVER_ALLOCATION" | "FAILED" | "UNKNOWN";
 
 export interface GeometryTransformation {
   step: string;

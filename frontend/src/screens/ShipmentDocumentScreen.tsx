@@ -2,8 +2,25 @@ import React, { useState } from "react";
 import { extractDocument, confirmDocument } from "../api/client";
 import { DEMO_SAMPLE_DOCUMENT_TEXT } from "../types/demoFixtures";
 import type { DocumentExtractionResponse, ExtractedFields } from "../types";
+import {
+  FileText,
+  CheckCircle2,
+  AlertTriangle,
+  UserCheck,
+  ArrowRight,
+  ShieldCheck,
+  FileCheck,
+} from "lucide-react";
 
-export const ShipmentDocumentScreen: React.FC<{ onConfirmed?: () => void }> = ({ onConfirmed }) => {
+interface ShipmentDocumentScreenProps {
+  onConfirmed?: () => void;
+  onNavigateToLedger?: () => void;
+}
+
+export const ShipmentDocumentScreen: React.FC<ShipmentDocumentScreenProps> = ({
+  onConfirmed,
+  onNavigateToLedger,
+}) => {
   const [docText, setDocText] = useState<string>(DEMO_SAMPLE_DOCUMENT_TEXT);
   const [fileName, setFileName] = useState<string>("bill_of_lading_9941.txt");
   const [extraction, setExtraction] = useState<DocumentExtractionResponse | null>(null);
@@ -49,91 +66,151 @@ export const ShipmentDocumentScreen: React.FC<{ onConfirmed?: () => void }> = ({
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-6 rounded-lg border border-[#e2e8e0] shadow-sm">
-        <h2 className="text-xl font-bold text-[#081c15] tracking-tight">
-          Shipment Document Extraction &amp; Human Confirmation
-        </h2>
-        <p className="text-sm text-slate-600 mt-1">
-          Automated structured field extraction from bills of lading. Enforces human confirmation before an on-chain shipment claim can be registered.
-        </p>
-
-        {error && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 text-red-800 rounded text-xs">
-            <strong>Error:</strong> {error}
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-[#DCE5DE]">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-bold tracking-tight text-[#172820]">
+              Document Extraction
+            </h2>
+            <span className="font-mono text-xs bg-slate-100 text-[#65756C] px-2.5 py-0.5 rounded-full border border-[#DCE5DE]">
+              Rule-Based NLP &bull; Human Confirmation Gate
+            </span>
           </div>
-        )}
-        {confirmedSuccess && (
-          <div className="mt-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded text-xs">
-            <strong>Document Confirmed!</strong> Extraction status updated to CONFIRMED. Ready for on-chain claim submission.
-          </div>
-        )}
+          <p className="text-sm text-[#65756C] mt-1">
+            Convert shipment documents into structured, reviewable claim records with mandatory human operator sign-off.
+          </p>
+        </div>
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-          {/* Document Ingestion Text */}
-          <div className="space-y-3">
+      {error && (
+        <div className="p-3 bg-[#B83A3A]/10 border border-[#B83A3A]/25 rounded-md text-xs text-[#B83A3A] flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {confirmedSuccess && (
+        <div className="p-4 bg-[#16805D]/10 border border-[#16805D]/30 rounded-lg text-xs text-[#16805D] flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 shrink-0" />
             <div>
-              <label className="block text-xs font-semibold text-slate-700">Document File Name</label>
-              <input
-                type="text"
-                value={fileName}
-                onChange={(e) => setFileName(e.target.value)}
-                className="mt-1 w-full text-xs font-mono px-3 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-[#1b4332]"
-              />
+              <strong className="block text-sm">Document Confirmed by Operator {operatorId}</strong>
+              <p className="text-[11px] text-[#16805D]/90 mt-0.5">
+                Status updated to CONFIRMED. The verified shipment quantity ({editableFields?.declared_weight_kg.toLocaleString()} kg) is ready for on-chain claim submission.
+              </p>
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700">
-                Raw Commercial Invoice / Bill of Lading Text
-              </label>
-              <textarea
-                rows={12}
-                value={docText}
-                onChange={(e) => setDocText(e.target.value)}
-                className="mt-1 w-full text-xs font-mono p-3 border border-slate-300 rounded bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#1b4332]"
-              />
-            </div>
+          </div>
+          {onNavigateToLedger && (
             <button
-              onClick={handleExtract}
-              disabled={loading}
-              className="px-4 py-2 text-xs font-semibold rounded bg-[#1b4332] hover:bg-[#2d6a4f] text-white transition disabled:opacity-50"
+              onClick={onNavigateToLedger}
+              className="px-3.5 py-1.5 rounded-md bg-[#16805D] text-white hover:bg-[#103126] transition font-semibold text-xs flex items-center gap-1.5 shrink-0 cursor-pointer"
             >
-              {loading ? "Extracting Fields..." : "Extract Structured Fields"}
+              <span>Submit to Claim Ledger</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
+          )}
+        </div>
+      )}
+
+      {/* Two-Column Document Review Workspace */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left Column: Raw Document Input (5 cols) */}
+        <div className="lg:col-span-5 bg-white p-5 rounded-lg border border-[#DCE5DE] shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-[#DCE5DE] pb-3">
+            <h3 className="text-base font-bold text-[#172820] flex items-center gap-2">
+              <FileText className="w-4 h-4 text-[#237A57]" />
+              <span>Source Document Ingestion</span>
+            </h3>
+            <span className="text-[11px] font-mono text-[#65756C]">Plaintext / PDF OCR</span>
           </div>
 
-          {/* Extracted Fields & Human Confirmation Form */}
-          <div className="space-y-4">
-            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-              Human-in-the-Loop Field Verification
-            </h3>
+          <div>
+            <label className="block text-[11px] font-semibold text-[#172820]">
+              Document Filename
+            </label>
+            <input
+              type="text"
+              value={fileName}
+              onChange={(e) => setFileName(e.target.value)}
+              className="mt-1 w-full text-xs font-mono px-3 py-1.5 border border-[#DCE5DE] rounded-md bg-[#F5F7F4] focus:bg-white focus:border-[#237A57] outline-hidden"
+            />
+          </div>
 
-            {editableFields ? (
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded space-y-3 text-xs">
-                {/* Provenance and Confidence Header */}
-                {extraction && (
-                  <div className="flex flex-wrap items-center justify-between p-2.5 bg-white border border-slate-200 rounded">
-                    <div>
-                      <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Engine Source:</span>
-                      <div className="font-mono font-semibold text-slate-800 text-[11px]">{extraction.extraction_source}</div>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Confidence:</span>
-                      <div className="font-bold text-[#1b4332] text-xs">{(extraction.confidence_score * 100).toFixed(0)}%</div>
-                    </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-[#172820] flex items-center justify-between">
+              <span>Raw Commercial Invoice / Bill of Lading Text</span>
+              <span className="text-[10px] font-mono text-[#65756C]">WGS84 Reference Match</span>
+            </label>
+            <textarea
+              rows={13}
+              value={docText}
+              onChange={(e) => setDocText(e.target.value)}
+              className="mt-1 w-full text-xs font-mono p-3 border border-[#DCE5DE] rounded-md bg-[#F5F7F4] focus:bg-white focus:border-[#237A57] outline-hidden leading-relaxed"
+            />
+          </div>
+
+          <button
+            onClick={handleExtract}
+            disabled={loading}
+            className="w-full py-2 px-3 text-xs font-semibold rounded-md bg-[#237A57] hover:bg-[#103126] text-white transition shadow-xs cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+          >
+            <FileCheck className="w-3.5 h-3.5" />
+            <span>{loading ? "Extracting Structured Fields..." : "Extract Structured Fields"}</span>
+          </button>
+
+          {/* Engine Provenance Note */}
+          <div className="p-3 bg-[#F5F7F4] rounded-md border border-[#DCE5DE] text-[11px] text-[#65756C] space-y-1">
+            <div className="flex items-center justify-between font-mono">
+              <span>Parser: Regex &amp; Semantic Rule Extractor</span>
+              <span>Off-Chain</span>
+            </div>
+            <p>
+              Private commercial invoices and seller details remain off-chain to maintain trade privacy. Only verified hashes and quantities anchor to the public ledger.
+            </p>
+          </div>
+        </div>
+
+        {/* Right Column: Structured Field Review & Operator Sign-off (7 cols) */}
+        <div className="lg:col-span-7 bg-white p-5 rounded-lg border border-[#DCE5DE] shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-[#DCE5DE] pb-3">
+            <div>
+              <h3 className="text-base font-bold text-[#172820] flex items-center gap-2">
+                <UserCheck className="w-4 h-4 text-[#237A57]" />
+                <span>Structured Field Review &amp; Confirmation</span>
+              </h3>
+              <p className="text-xs text-[#65756C]">
+                Human verification of automated extraction before ledger anchoring.
+              </p>
+            </div>
+            {extraction && (
+              <span className="text-xs font-mono font-semibold text-[#16805D] bg-[#16805D]/10 px-2.5 py-1 rounded-full border border-[#16805D]/25">
+                {(extraction.confidence_score * 100).toFixed(0)}% Confidence
+              </span>
+            )}
+          </div>
+
+          {editableFields ? (
+            <div className="space-y-4">
+              {/* Warnings / Field Notices */}
+              {extraction?.warnings && extraction.warnings.length > 0 && (
+                <div className="p-3 bg-[#B7791F]/10 border border-[#B7791F]/30 rounded-md text-xs text-[#B7791F] space-y-1">
+                  <div className="font-bold flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    <span>Extraction Notices:</span>
                   </div>
-                )}
+                  {extraction.warnings.map((w, idx) => (
+                    <div key={idx} className="text-[11px]">&bull; {w}</div>
+                  ))}
+                </div>
+              )}
 
-                {/* Warnings / Missing Fields Banner */}
-                {extraction?.warnings && extraction.warnings.length > 0 && (
-                  <div className="p-2.5 bg-amber-50 border border-amber-200 rounded text-amber-900 text-[11px] space-y-1">
-                    <strong className="block text-[10px] uppercase tracking-wider">Field Notice:</strong>
-                    {extraction.warnings.map((w, idx) => (
-                      <div key={idx}>&bull; {w}</div>
-                    ))}
-                  </div>
-                )}
-
+              {/* Form Fields */}
+              <div className="space-y-3">
                 <div>
-                  <label className="block text-slate-500 font-medium">Shipment Identifier (BOL / Invoice)</label>
+                  <label className="block text-[11px] font-semibold text-[#172820]">
+                    Shipment Identifier (BOL / Invoice)
+                  </label>
                   <input
                     type="text"
                     value={editableFields.shipment_identifier || editableFields.bill_of_lading_number || ""}
@@ -141,108 +218,137 @@ export const ShipmentDocumentScreen: React.FC<{ onConfirmed?: () => void }> = ({
                       setEditableFields({
                         ...editableFields,
                         shipment_identifier: e.target.value,
-                        bill_of_lading_number: e.target.value
+                        bill_of_lading_number: e.target.value,
                       })
                     }
-                    className="mt-1 w-full text-xs font-mono px-2 py-1.5 border border-slate-300 rounded bg-white"
+                    className="mt-1 w-full text-xs font-mono px-3 py-1.5 border border-[#DCE5DE] rounded-md bg-[#F5F7F4] focus:bg-white focus:border-[#237A57] outline-hidden"
                   />
                   {editableFields.field_evidence?.["shipment_identifier"]?.source_snippet && (
-                    <span className="text-[10px] text-slate-400 font-mono block mt-0.5">
+                    <span className="text-[10px] text-[#65756C] font-mono block mt-0.5">
                       Matched: "{editableFields.field_evidence["shipment_identifier"].source_snippet}"
                     </span>
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-slate-500 font-medium">Declared Weight (kg)</label>
+                    <label className="block text-[11px] font-semibold text-[#172820]">
+                      Declared Mass (kg)
+                    </label>
                     <input
                       type="number"
                       value={editableFields.declared_weight_kg}
                       onChange={(e) =>
-                        setEditableFields({ ...editableFields, declared_weight_kg: Number(e.target.value) })
+                        setEditableFields({
+                          ...editableFields,
+                          declared_weight_kg: Number(e.target.value),
+                        })
                       }
-                      className="mt-1 w-full text-xs font-mono font-bold text-[#1b4332] px-2 py-1.5 border border-slate-300 rounded bg-white"
+                      className="mt-1 w-full text-xs font-mono font-bold text-[#237A57] px-3 py-1.5 border border-[#DCE5DE] rounded-md bg-[#F5F7F4] focus:bg-white focus:border-[#237A57] outline-hidden tabular-nums"
                     />
                     {editableFields.field_evidence?.["shipment_quantity"]?.source_snippet && (
-                      <span className="text-[10px] text-slate-400 font-mono block mt-0.5">
+                      <span className="text-[10px] text-[#65756C] font-mono block mt-0.5">
                         Matched: "{editableFields.field_evidence["shipment_quantity"].source_snippet}"
                       </span>
                     )}
                   </div>
+
                   <div>
-                    <label className="block text-slate-500 font-medium">Referenced Plot Cadastre</label>
+                    <label className="block text-[11px] font-semibold text-[#172820]">
+                      Referenced Plot Identifier
+                    </label>
                     <input
                       type="text"
                       value={editableFields.referenced_plot_id || ""}
-                      placeholder="e.g. PLOT-BASE-DEMO"
                       onChange={(e) =>
-                        setEditableFields({ ...editableFields, referenced_plot_id: e.target.value })
+                        setEditableFields({
+                          ...editableFields,
+                          referenced_plot_id: e.target.value,
+                        })
                       }
-                      className="mt-1 w-full text-xs font-mono px-2 py-1.5 border border-slate-300 rounded bg-white"
+                      className="mt-1 w-full text-xs font-mono px-3 py-1.5 border border-[#DCE5DE] rounded-md bg-[#F5F7F4] focus:bg-white focus:border-[#237A57] outline-hidden"
                     />
                     {editableFields.field_evidence?.["referenced_plot_id"]?.source_snippet && (
-                      <span className="text-[10px] text-slate-400 font-mono block mt-0.5">
+                      <span className="text-[10px] text-[#65756C] font-mono block mt-0.5">
                         Matched: "{editableFields.field_evidence["referenced_plot_id"].source_snippet}"
                       </span>
                     )}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-slate-500 font-medium">Commodity Code</label>
+                    <label className="block text-[11px] font-semibold text-[#172820]">
+                      Commodity Code
+                    </label>
                     <input
                       type="text"
                       value={editableFields.commodity_code}
                       onChange={(e) =>
                         setEditableFields({ ...editableFields, commodity_code: e.target.value })
                       }
-                      className="mt-1 w-full text-xs font-mono px-2 py-1.5 border border-slate-300 rounded bg-white"
+                      className="mt-1 w-full text-xs font-mono px-3 py-1.5 border border-[#DCE5DE] rounded-md bg-[#F5F7F4] focus:bg-white focus:border-[#237A57] outline-hidden"
                     />
                   </div>
+
                   <div>
-                    <label className="block text-slate-500 font-medium">Shipment Date</label>
+                    <label className="block text-[11px] font-semibold text-[#172820]">
+                      Shipment Date
+                    </label>
                     <input
                       type="text"
                       value={editableFields.shipment_date}
                       onChange={(e) =>
                         setEditableFields({ ...editableFields, shipment_date: e.target.value })
                       }
-                      className="mt-1 w-full text-xs font-mono px-2 py-1.5 border border-slate-300 rounded bg-white"
+                      className="mt-1 w-full text-xs font-mono px-3 py-1.5 border border-[#DCE5DE] rounded-md bg-[#F5F7F4] focus:bg-white focus:border-[#237A57] outline-hidden"
                     />
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-slate-500 font-medium">Verifying Officer ID</label>
+                <div className="pt-2 border-t border-[#DCE5DE]">
+                  <label className="block text-[11px] font-semibold text-[#172820]">
+                    Verifying Customs Officer Identifier
+                  </label>
                   <input
                     type="text"
                     value={operatorId}
                     onChange={(e) => setOperatorId(e.target.value)}
-                    className="mt-1 w-full text-xs font-mono px-2 py-1.5 border border-slate-300 rounded bg-white"
+                    className="mt-1 w-full text-xs font-mono px-3 py-1.5 border border-[#DCE5DE] rounded-md bg-[#F5F7F4] focus:bg-white focus:border-[#237A57] outline-hidden"
                   />
-                  <span className="text-[10px] text-slate-400 block mt-0.5">
-                    Human confirmation is required. AI draft cannot automatically register on-chain.
+                  <span className="text-[10px] text-[#65756C] block mt-0.5">
+                    Attestation is permanently bound to the shipment transaction proof bundle.
                   </span>
                 </div>
+              </div>
 
-                <div className="pt-2">
-                  <button
-                    onClick={handleConfirm}
-                    disabled={confirming || confirmedSuccess}
-                    className="w-full py-2 text-xs font-semibold rounded bg-[#1b4332] hover:bg-[#2d6a4f] text-white transition disabled:opacity-50"
-                  >
-                    {confirming ? "Confirming..." : confirmedSuccess ? "Confirmed" : "Confirm Fields & Authorize Claim"}
-                  </button>
-                </div>
+              <button
+                onClick={handleConfirm}
+                disabled={confirming || confirmedSuccess}
+                className="w-full py-2.5 px-4 text-xs font-semibold rounded-md bg-[#237A57] hover:bg-[#103126] text-white transition shadow-xs cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>
+                  {confirming
+                    ? "Recording Confirmation..."
+                    : confirmedSuccess
+                    ? "Confirmed by Operator"
+                    : "Confirm Fields & Authorize Claim Record"}
+                </span>
+              </button>
+            </div>
+          ) : (
+            /* Meaningful Empty State */
+            <div className="p-12 text-center bg-[#F5F7F4] rounded-lg border border-dashed border-[#DCE5DE] space-y-3">
+              <FileText className="w-10 h-10 text-[#65756C]/40 mx-auto" />
+              <div>
+                <h4 className="text-sm font-bold text-[#172820]">No Document Extracted Yet</h4>
+                <p className="text-xs text-[#65756C] mt-1 max-w-sm mx-auto">
+                  Click "Extract Structured Fields" on the left to parse the bill of lading and initiate human operator confirmation.
+                </p>
               </div>
-            ) : (
-              <div className="p-8 text-center bg-slate-50 border border-dashed border-slate-200 rounded text-xs text-slate-500">
-                Click "Extract Structured Fields" to parse the raw invoice and initiate operator verification.
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

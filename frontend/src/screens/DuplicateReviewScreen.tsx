@@ -2,9 +2,26 @@ import React, { useEffect, useState, useCallback } from "react";
 import { listPendingReviews, adjudicateReview, getPlot } from "../api/client";
 import { MapPreview } from "../components/MapPreview";
 import { StatusBadge } from "../components/Badges";
-import type { SpatialReviewItem, PlotRecord } from "../types";
+import type { SpatialReviewItem, PlotRecord, ReviewStatus } from "../types";
+import {
+  CheckCircle2,
+  AlertTriangle,
+  RefreshCw,
+  UserCheck,
+  ShieldCheck,
+  ArrowRight,
+  Info,
+} from "lucide-react";
 
-export const DuplicateReviewScreen: React.FC<{ onReviewResolved?: () => void }> = ({ onReviewResolved }) => {
+interface DuplicateReviewScreenProps {
+  onReviewResolved?: () => void;
+  onNavigateToPlots?: () => void;
+}
+
+export const DuplicateReviewScreen: React.FC<DuplicateReviewScreenProps> = ({
+  onReviewResolved,
+  onNavigateToPlots,
+}) => {
   const [reviews, setReviews] = useState<SpatialReviewItem[]>([]);
   const [selectedReview, setSelectedReview] = useState<SpatialReviewItem | null>(null);
   const [submittedPlot, setSubmittedPlot] = useState<PlotRecord | null>(null);
@@ -19,6 +36,9 @@ export const DuplicateReviewScreen: React.FC<{ onReviewResolved?: () => void }> 
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // Confirmation dialog state
+  const [pendingAction, setPendingAction] = useState<ReviewStatus | null>(null);
+
   const fetchReviews = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -26,7 +46,14 @@ export const DuplicateReviewScreen: React.FC<{ onReviewResolved?: () => void }> 
       const data = await listPendingReviews();
       setReviews(data);
       if (data.length > 0) {
-        setSelectedReview((prev) => prev || data[0]);
+        setSelectedReview((prev) => {
+          if (prev && data.some((r) => r.review_id === prev.review_id)) {
+            return prev;
+          }
+          return data[0];
+        });
+      } else {
+        setSelectedReview(null);
       }
     } catch (err: any) {
       setError(err.message || "Failed to load review queue");
@@ -51,8 +78,8 @@ export const DuplicateReviewScreen: React.FC<{ onReviewResolved?: () => void }> 
       if (!selectedReview) return;
       try {
         const [sub, conf] = await Promise.all([
-          getPlot(selectedReview.submitted_plot_id),
-          getPlot(selectedReview.conflicting_plot_id),
+          getPlot(selectedReview.submitted_plot_id).catch(() => null),
+          getPlot(selectedReview.conflicting_plot_id).catch(() => null),
         ]);
         if (isMounted) {
           setSubmittedPlot(sub);
@@ -68,11 +95,11 @@ export const DuplicateReviewScreen: React.FC<{ onReviewResolved?: () => void }> 
     };
   }, [selectedReview]);
 
-
-  const handleAdjudicate = async (action: "CONFIRMED_DUPLICATE" | "APPROVED_SEPARATE_PARCEL") => {
-    if (!selectedReview) return;
+  const confirmAdjudication = async () => {
+    if (!selectedReview || !pendingAction) return;
     if (justification.trim().length < 15) {
       setError("Please provide a comprehensive justification of at least 15 characters.");
+      setPendingAction(null);
       return;
     }
 
@@ -82,13 +109,14 @@ export const DuplicateReviewScreen: React.FC<{ onReviewResolved?: () => void }> 
     try {
       const res = await adjudicateReview(
         selectedReview.review_id,
-        action,
+        pendingAction,
         operatorId,
         justification
       );
       setSuccessMsg(
-        `Review adjudicated successfully! Plot '${selectedReview.submitted_plot_id}' updated to '${res.new_plot_status}'.`
+        `Review adjudicated successfully! Plot '${selectedReview.submitted_plot_id}' updated to status '${res.new_plot_status}'.`
       );
+      setPendingAction(null);
       await fetchReviews();
       if (onReviewResolved) {
         onReviewResolved();
@@ -111,180 +139,323 @@ export const DuplicateReviewScreen: React.FC<{ onReviewResolved?: () => void }> 
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-6 rounded-lg border border-[#e2e8e0] shadow-sm">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-bold text-[#081c15] tracking-tight">
-              Spatial Match Review Queue
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-[#DCE5DE]">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-bold tracking-tight text-[#172820]">
+              Duplicate Review
             </h2>
-            <p className="text-sm text-slate-600 mt-1">
-              Human-in-the-loop adjudication for ambiguous boundary conflicts. Prevents coordinate laundering without falsely merging neighboring farms.
-            </p>
+            <span
+              className={`font-mono text-xs px-2.5 py-0.5 rounded-full font-medium ${
+                reviews.length > 0
+                  ? "bg-[#B7791F]/15 text-[#B7791F] border border-[#B7791F]/30"
+                  : "bg-[#16805D]/10 text-[#16805D] border border-[#16805D]/25"
+              }`}
+            >
+              {reviews.length} pending review cases
+            </span>
           </div>
-          <button
-            onClick={fetchReviews}
-            className="text-xs px-3 py-1.5 border border-slate-300 rounded hover:bg-slate-50 font-medium text-slate-700 transition"
-          >
-            Refresh Queue
-          </button>
+          <p className="text-sm text-[#65756C] mt-1">
+            Investigate potential plot identity conflicts and resolve ambiguous boundary matches.
+          </p>
         </div>
+        <button
+          onClick={fetchReviews}
+          disabled={loading}
+          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-[#65756C] bg-white hover:text-[#172820] hover:bg-[#F5F7F4] border border-[#DCE5DE] rounded-md transition cursor-pointer self-start sm:self-auto"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+          <span>Refresh Queue</span>
+        </button>
+      </div>
 
-        {loading && <p className="text-xs text-slate-500 py-4">Loading pending reviews...</p>}
-        {error && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 text-red-800 rounded text-xs">
-            <strong>Error:</strong> {error}
-          </div>
-        )}
-        {successMsg && (
-          <div className="mt-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded text-xs">
-            <strong>Success:</strong> {successMsg}
-          </div>
-        )}
+      {error && (
+        <div className="p-3 bg-[#B83A3A]/10 border border-[#B83A3A]/25 rounded-md text-xs text-[#B83A3A] flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
 
-        {!loading && reviews.length === 0 && (
-          <div className="mt-6 p-8 text-center bg-slate-50 border border-dashed border-slate-200 rounded">
-            <p className="text-sm text-slate-600 font-medium">No pending review cases.</p>
-            <p className="text-xs text-slate-400 mt-1">
-              All registered plots are currently either distinct or resolved. To generate an ambiguous conflict, register an overlapping polygon from the Plot Ingestion tab.
+      {successMsg && (
+        <div className="p-3 bg-[#16805D]/10 border border-[#16805D]/25 rounded-md text-xs text-[#16805D] flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          <span>{successMsg}</span>
+        </div>
+      )}
+
+      {/* Empty State when 0 reviews */}
+      {!loading && reviews.length === 0 && (
+        <div className="bg-white p-12 rounded-lg border border-[#DCE5DE] shadow-xs text-center space-y-4 max-w-2xl mx-auto my-6">
+          <div className="w-12 h-12 rounded-full bg-[#16805D]/10 text-[#16805D] flex items-center justify-center mx-auto">
+            <ShieldCheck className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-[#172820]">No Pending Review Cases</h3>
+            <p className="text-xs text-[#65756C] mt-1 leading-relaxed max-w-md mx-auto">
+              All registered plot boundaries are currently confirmed distinct or previously adjudicated. The continuous IoU deduplication queue is clear.
             </p>
           </div>
-        )}
+          {onNavigateToPlots && (
+            <div className="pt-2">
+              <button
+                onClick={onNavigateToPlots}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-[#237A57] hover:bg-[#103126] rounded-md transition shadow-xs cursor-pointer"
+              >
+                <span>Register Overlapping Plot in Registry</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
-        {reviews.length > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-            {/* Reviews List */}
-            <div className="lg:col-span-1 border border-slate-200 rounded divide-y divide-slate-100 max-h-[500px] overflow-y-auto">
-              {reviews.map((r) => (
-                <div
-                  key={r.review_id}
-                  onClick={() => setSelectedReview(r)}
-                  className={`p-3 text-xs cursor-pointer transition ${
-                    selectedReview?.review_id === r.review_id
-                      ? "bg-emerald-50/60 border-l-4 border-[#1b4332]"
-                      : "hover:bg-slate-50"
-                  }`}
-                >
-                  <div className="flex justify-between items-center font-semibold text-slate-800">
-                    <span className="truncate">{r.submitted_plot_id}</span>
-                    <span className="text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded text-[10px]">
-                      IoU: {(r.iou * 100).toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="text-slate-500 mt-1 text-[11px]">
-                    Conflict: {r.conflicting_plot_id}
-                  </div>
-                  <div className="text-slate-400 text-[10px] mt-0.5">
-                    Drift: {r.centroid_distance_m}m | Created: {r.created_at.slice(0, 10)}
-                  </div>
-                </div>
-              ))}
+      {/* Two-Panel Review Workbench */}
+      {reviews.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Left Panel: Review Queue List (4 cols) */}
+          <div className="lg:col-span-4 bg-white rounded-lg border border-[#DCE5DE] shadow-xs overflow-hidden">
+            <div className="p-3.5 border-b border-[#DCE5DE] bg-[#F5F7F4] flex items-center justify-between">
+              <span className="text-xs font-bold text-[#172820] uppercase font-mono tracking-wider">
+                Conflict Queue ({reviews.length})
+              </span>
+              <span className="text-[11px] text-[#65756C]">Sorted by IoU</span>
             </div>
 
-            {/* Side-by-side comparison & adjudication controls */}
-            {selectedReview && (
-              <div className="lg:col-span-2 space-y-4">
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded text-xs space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-800">Conflict Case #{selectedReview.review_id.slice(-8)}</span>
-                    <StatusBadge status={selectedReview.status} />
+            <div className="divide-y divide-[#DCE5DE] max-h-[560px] overflow-y-auto">
+              {reviews.map((r) => {
+                const isSelected = selectedReview?.review_id === r.review_id;
+                return (
+                  <div
+                    key={r.review_id}
+                    onClick={() => setSelectedReview(r)}
+                    className={`p-3.5 text-xs cursor-pointer transition ${
+                      isSelected
+                        ? "bg-[#103126]/5 border-l-4 border-[#237A57]"
+                        : "hover:bg-[#F5F7F4]"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-mono font-bold text-[#172820] truncate">
+                        {r.submitted_plot_id}
+                      </span>
+                      <span className="font-mono font-bold text-[11px] text-[#B7791F] bg-[#B7791F]/10 px-1.5 py-0.5 rounded border border-[#B7791F]/25">
+                        IoU: {(r.iou * 100).toFixed(1)}%
+                      </span>
+                    </div>
+
+                    <div className="text-[11px] text-[#65756C] flex items-center justify-between">
+                      <span>vs. {r.conflicting_plot_id}</span>
+                      <span className="font-mono text-[10px]">
+                        Drift: {r.centroid_distance_m}m
+                      </span>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 pt-1">
-                    <div>
-                      <span className="text-slate-500">Submitted Plot:</span>
-                      <p className="font-mono font-semibold text-[#1b4332]">
-                        {selectedReview.submitted_plot_id}
-                      </p>
-                      <p className="text-[11px] text-slate-600">
-                        Area: {submittedPlot?.geodesic_area_ha || "..."} ha
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Existing Conflicting Plot:</span>
-                      <p className="font-mono font-semibold text-amber-700">
-                        {selectedReview.conflicting_plot_id}
-                      </p>
-                      <p className="text-[11px] text-slate-600">
-                        Area: {conflictingPlot?.geodesic_area_ha || "..."} ha
-                      </p>
-                    </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Right Panel: Detailed Comparison Workspace (8 cols) */}
+          {selectedReview && (
+            <div className="lg:col-span-8 space-y-4">
+              {/* Conflict Case Overview Card */}
+              <div className="bg-white p-5 rounded-lg border border-[#DCE5DE] shadow-xs space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#DCE5DE] pb-3">
+                  <div>
+                    <span className="text-[11px] font-mono text-[#65756C] uppercase">
+                      Case #{selectedReview.review_id.slice(-8)}
+                    </span>
+                    <h3 className="text-base font-bold text-[#172820] font-mono mt-0.5">
+                      {selectedReview.submitted_plot_id} vs {selectedReview.conflicting_plot_id}
+                    </h3>
+                  </div>
+                  <StatusBadge status={selectedReview.status} />
+                </div>
+
+                {/* Overlap Metrics Strip */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div className="p-3 bg-[#F5F7F4] rounded-md border border-[#DCE5DE]">
+                    <span className="text-[11px] text-[#65756C]">Intersection / Union:</span>
+                    <p className="font-mono font-bold text-[#B7791F] text-base mt-0.5">
+                      {(selectedReview.iou * 100).toFixed(1)}%
+                    </p>
+                  </div>
+                  <div className="p-3 bg-[#F5F7F4] rounded-md border border-[#DCE5DE]">
+                    <span className="text-[11px] text-[#65756C]">Centroid Distance:</span>
+                    <p className="font-mono font-bold text-[#172820] text-base mt-0.5">
+                      {selectedReview.centroid_distance_m} m
+                    </p>
+                  </div>
+                  <div className="p-3 bg-[#F5F7F4] rounded-md border border-[#DCE5DE]">
+                    <span className="text-[11px] text-[#65756C]">Submitted Area:</span>
+                    <p className="font-mono font-bold text-[#237A57] text-base mt-0.5">
+                      {submittedPlot?.geodesic_area_ha ? `${submittedPlot.geodesic_area_ha.toFixed(2)} ha` : "..."}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-[#F5F7F4] rounded-md border border-[#DCE5DE]">
+                    <span className="text-[11px] text-[#65756C]">Conflicting Area:</span>
+                    <p className="font-mono font-bold text-[#B7791F] text-base mt-0.5">
+                      {conflictingPlot?.geodesic_area_ha ? `${conflictingPlot.geodesic_area_ha.toFixed(2)} ha` : "..."}
+                    </p>
                   </div>
                 </div>
 
-                {/* Overlaid Map Visualizer */}
-                <div>
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="font-semibold text-slate-700">Overlaid Geographic Comparison</span>
-                    <span className="text-slate-500 text-[11px]">
-                      <span className="inline-block w-2.5 h-2.5 bg-[#2d6a4f] rounded-full mr-1 align-middle" />
-                      Submitted (Green) &nbsp;&nbsp;
-                      <span className="inline-block w-2.5 h-2.5 bg-[#f59e0b] rounded-full mr-1 align-middle" />
-                      Conflicting Existing (Orange)
+                {/* Dual-Polygon Comparison Map */}
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-[#172820]">
+                      Overlaid Boundary Map Visualization
                     </span>
+                    <div className="flex items-center gap-3 text-[11px]">
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-3 h-3 rounded-xs bg-[#237A57] border border-[#16805D]" />
+                        <span>Submitted (Solid Green)</span>
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-3 h-3 rounded-xs bg-[#B7791F]/30 border border-[#B7791F] border-dashed" />
+                        <span>Existing Candidate (Dashed Amber)</span>
+                      </span>
+                    </div>
                   </div>
+
                   <MapPreview
                     geojson={parseGeojson(submittedPlot?.raw_geojson)}
                     comparisonGeojson={parseGeojson(conflictingPlot?.raw_geojson)}
-                    height="260px"
+                    height="320px"
                   />
                 </div>
 
-                {/* Adjudication Form */}
-                <div className="p-4 bg-white border border-slate-200 rounded space-y-3">
-                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                    Operator Adjudication Decision
+                {/* Adjudication Workbench Form */}
+                <div className="pt-4 border-t border-[#DCE5DE] space-y-3">
+                  <h4 className="text-xs font-bold text-[#172820] uppercase font-mono tracking-wider flex items-center gap-2">
+                    <UserCheck className="w-4 h-4 text-[#237A57]" />
+                    <span>Human Operator Adjudication</span>
                   </h4>
-                  <div className="grid grid-cols-2 gap-3">
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-700">Operator ID</label>
+                      <label className="block text-[11px] font-semibold text-[#172820]">
+                        Operator Identifier
+                      </label>
                       <input
                         type="text"
                         value={operatorId}
                         onChange={(e) => setOperatorId(e.target.value)}
-                        className="mt-1 w-full text-xs font-mono px-3 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-[#1b4332]"
+                        className="mt-1 w-full text-xs font-mono px-3 py-1.5 border border-[#DCE5DE] rounded-md bg-[#F5F7F4] focus:bg-white focus:border-[#237A57] focus:ring-1 focus:ring-[#237A57] outline-hidden"
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700">Spatial Decision</label>
-                      <div className="text-[11px] text-slate-500 mt-2">
-                        Must choose whether this is a fraudulent duplicate or a bona fide separate plot.
-                      </div>
+                    <div className="text-xs text-[#65756C] flex items-center p-2 bg-[#F5F7F4] rounded-md border border-[#DCE5DE]">
+                      <Info className="w-4 h-4 text-[#65756C] mr-2 shrink-0" />
+                      <span>
+                        Adjudication records are cryptographically anchored into the plot audit bundle.
+                      </span>
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700">
-                      Adjudication Justification &amp; Audit Rationale (min 15 chars)
+                    <label className="block text-[11px] font-semibold text-[#172820]">
+                      Adjudication Justification &amp; Cadastral Evidence (min 15 chars)
                     </label>
                     <textarea
                       rows={2}
                       value={justification}
                       onChange={(e) => setJustification(e.target.value)}
-                      className="mt-1 w-full text-xs p-2 border border-slate-300 rounded focus:ring-1 focus:ring-[#1b4332]"
+                      className="mt-1 w-full text-xs p-2.5 border border-[#DCE5DE] rounded-md bg-[#F5F7F4] focus:bg-white focus:border-[#237A57] focus:ring-1 focus:ring-[#237A57] outline-hidden leading-relaxed"
                     />
+                    <div className="flex justify-between text-[11px] text-[#65756C] mt-1">
+                      <span>Requires minimum 15 characters for provenance trail</span>
+                      <span className="font-mono">{justification.trim().length} chars</span>
+                    </div>
                   </div>
 
-                  <div className="flex gap-3 pt-1">
+                  {/* Actions */}
+                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
                     <button
-                      onClick={() => handleAdjudicate("CONFIRMED_DUPLICATE")}
+                      onClick={() => setPendingAction("CONFIRMED_DUPLICATE")}
                       disabled={actionLoading}
-                      className="flex-1 py-2 text-xs font-semibold rounded bg-red-600 hover:bg-red-700 text-white transition disabled:opacity-50"
+                      className="flex-1 py-2 px-3 text-xs font-semibold rounded-md bg-[#B83A3A] hover:bg-[#991B1B] text-white transition shadow-xs cursor-pointer disabled:opacity-50"
                     >
-                      {actionLoading ? "Adjudicating..." : "Confirm as Duplicate (Reject Plot)"}
+                      Confirm Same Plot (Duplicate Reject)
                     </button>
                     <button
-                      onClick={() => handleAdjudicate("APPROVED_SEPARATE_PARCEL")}
+                      onClick={() => setPendingAction("APPROVED_SEPARATE_PARCEL")}
                       disabled={actionLoading}
-                      className="flex-1 py-2 text-xs font-semibold rounded bg-[#1b4332] hover:bg-[#2d6a4f] text-white transition disabled:opacity-50"
+                      className="flex-1 py-2 px-3 text-xs font-semibold rounded-md bg-[#237A57] hover:bg-[#103126] text-white transition shadow-xs cursor-pointer disabled:opacity-50"
                     >
-                      {actionLoading ? "Adjudicating..." : "Approve as Separate Parcel (Activate)"}
+                      Approve as Separate Parcel (Activate)
                     </button>
                   </div>
                 </div>
               </div>
-            )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Confirmation Modal for Consequential Decisions */}
+      {pendingAction && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg border border-[#DCE5DE] shadow-xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div
+                className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                  pendingAction === "CONFIRMED_DUPLICATE"
+                    ? "bg-[#B83A3A]/10 text-[#B83A3A]"
+                    : "bg-[#237A57]/10 text-[#237A57]"
+                }`}
+              >
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-[#172820]">
+                  Confirm Adjudication Decision
+                </h3>
+                <p className="text-xs text-[#65756C]">
+                  This action is recorded in the immutable audit trail.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-[#F5F7F4] rounded-md border border-[#DCE5DE] text-xs space-y-1">
+              <div>
+                Target Plot: <strong className="font-mono text-[#172820]">{selectedReview?.submitted_plot_id}</strong>
+              </div>
+              <div>
+                Decision:{" "}
+                <strong className={pendingAction === "CONFIRMED_DUPLICATE" ? "text-[#B83A3A]" : "text-[#237A57]"}>
+                  {pendingAction === "CONFIRMED_DUPLICATE"
+                    ? "CONFIRMED DUPLICATE (Mark as FLAGGED_DUPLICATE)"
+                    : "APPROVED SEPARATE PARCEL (Activate Plot)"}
+                </strong>
+              </div>
+              <div>
+                Operator: <span className="font-mono">{operatorId}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={() => setPendingAction(null)}
+                className="px-4 py-2 text-xs font-medium text-[#65756C] hover:text-[#172820] bg-white border border-[#DCE5DE] rounded-md transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmAdjudication}
+                disabled={actionLoading}
+                className={`px-4 py-2 text-xs font-semibold text-white rounded-md transition shadow-xs cursor-pointer ${
+                  pendingAction === "CONFIRMED_DUPLICATE"
+                    ? "bg-[#B83A3A] hover:bg-[#991B1B]"
+                    : "bg-[#237A57] hover:bg-[#103126]"
+                }`}
+              >
+                {actionLoading ? "Executing..." : "Confirm & Commit Adjudication"}
+              </button>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

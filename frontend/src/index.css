@@ -2,7 +2,35 @@
 @import "leaflet/dist/leaflet.css";
 
 :root {
-  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  
+  /* SilvaPass Landing Page Premium Color System */
+  --color-bg-deep: #07130F;
+  --color-panel-forest: #10251C;
+  --color-panel-elevated: #163327;
+  --color-primary-green: #B7ED78;
+  --color-soft-mint: #80DDB0;
+  --color-warm-white: #F2F5ED;
+  --color-muted-text: #A2B4A8;
+  --color-amber-review: #F59E0B;
+  --color-red-reject: #EF4444;
+
+  /* SilvaPass Operational Console Design System Tokens */
+  --console-bg: #F5F7F4;
+  --console-sidebar: #09231B;
+  --console-sidebar-elevated: #103126;
+  --console-primary: #237A57;
+  --console-mint: #B6E986;
+  --console-text: #172820;
+  --console-text-muted: #65756C;
+  --console-border: #DCE5DE;
+  --console-white: #FFFFFF;
+  --console-amber: #B7791F;
+  --console-red: #B83A3A;
+  --console-green: #16805D;
+
+  /* Legacy app variables */
   --color-forest-primary: #1b4332;
   --color-forest-dark: #081c15;
   --color-forest-light: #2d6a4f;
@@ -12,13 +40,58 @@
   --color-sand-border: #e2e8e0;
 }
 
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   font-family: var(--font-sans);
-  background-color: var(--color-sand-bg);
-  color: #1e293b;
+  background-color: var(--color-bg-deep);
+  color: var(--color-warm-white);
   margin: 0;
   padding: 0;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Custom Grid Background Pattern */
+.bg-topo-grid {
+  background-image: 
+    linear-gradient(to right, rgba(128, 221, 176, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(128, 221, 176, 0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.bg-radial-glow {
+  background: radial-gradient(circle at 50% 20%, rgba(183, 237, 120, 0.08) 0%, transparent 60%);
+}
+
+.text-gradient-natural {
+  background: linear-gradient(135deg, #F2F5ED 0%, #B7ED78 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-gradient-mint {
+  background: linear-gradient(135deg, #B7ED78 0%, #80DDB0 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Glow Borders & Accents */
+.border-forest-glow {
+  border-color: rgba(183, 237, 120, 0.2);
+}
+
+.shadow-forest-glow {
+  box-shadow: 0 0 25px rgba(183, 237, 120, 0.12);
+}
+
+.shadow-mint-glow {
+  box-shadow: 0 0 25px rgba(128, 221, 176, 0.15);
 }
 
 /* Map containers */
@@ -26,4 +99,21 @@ body {
   width: 100%;
   height: 100%;
   border-radius: 0.375rem;
+}
+
+/* Accessibility: Visible Focus Rings & Reduced Motion */
+:focus-visible {
+  outline: 2px solid var(--console-primary, #237A57);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

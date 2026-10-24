@@ -1,9 +1,26 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { getAllowance, grantAllowance, submitClaim, releaseClaim, listClaims, getBlockchainStatus } from "../api/client";
+import {
+  getAllowance,
+  grantAllowance,
+  submitClaim,
+  releaseClaim,
+  listClaims,
+  getBlockchainStatus,
+} from "../api/client";
 import { StatusBadge } from "../components/Badges";
 import type { AllowanceResponse, ClaimResponse } from "../types";
+import {
+  ShieldCheck,
+  AlertTriangle,
+  CheckCircle2,
+  RefreshCw,
+} from "lucide-react";
 
-export const ClaimLedgerScreen: React.FC<{ activePlotId?: string }> = ({
+interface ClaimLedgerScreenProps {
+  activePlotId?: string;
+}
+
+export const ClaimLedgerScreen: React.FC<ClaimLedgerScreenProps> = ({
   activePlotId = "PLOT-BASE-DEMO",
 }) => {
   const [plotId, setPlotId] = useState<string>(activePlotId);
@@ -34,7 +51,12 @@ export const ClaimLedgerScreen: React.FC<{ activePlotId?: string }> = ({
   const [claimsHistory, setClaimsHistory] = useState<ClaimResponse[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [notification, setNotification] = useState<{ type: "success" | "warning"; msg: string } | null>(null);
+  const [notification, setNotification] = useState<{
+    type: "success" | "warning";
+    title: string;
+    msg: string;
+    details?: { attemptedKg: number; availableKg: number; excessKg: number };
+  } | null>(null);
 
   const fetchBlockchainStatus = useCallback(async () => {
     try {
@@ -72,7 +94,6 @@ export const ClaimLedgerScreen: React.FC<{ activePlotId?: string }> = ({
     fetchAllowance();
   }, [fetchBlockchainStatus, fetchAllowance]);
 
-
   const handleGrantAllowance = async () => {
     setLoading(true);
     setError(null);
@@ -88,7 +109,8 @@ export const ClaimLedgerScreen: React.FC<{ activePlotId?: string }> = ({
       setAllowance(res);
       setNotification({
         type: "success",
-        msg: `Authorized allowance of ${grantApprovedKg.toLocaleString()} kg registered on-chain for ${plotId} (Season ${seasonId}).`,
+        title: "Allowance Approved & Anchored",
+        msg: `Authorized ceiling of ${grantApprovedKg.toLocaleString()} kg registered on-chain for ${plotId} (Season ${seasonId}).`,
       });
     } catch (err: any) {
       setError(err.message || "Grant allowance failed");
@@ -113,18 +135,23 @@ export const ClaimLedgerScreen: React.FC<{ activePlotId?: string }> = ({
         shipment_evidence_hash: "0x" + "b".repeat(64),
       });
 
-      // Add to local ledger history
+      // Update local history
       setClaimsHistory((prev) => [res, ...prev.filter((c) => c.claim_id !== res.claim_id)]);
 
       if (res.status === "CONFIRMED") {
         setNotification({
           type: "success",
+          title: "Claim Verified & Anchored On-Chain",
           msg: `Claim '${res.claim_id}' for ${targetKg.toLocaleString()} kg confirmed! Remaining balance: ${res.remaining_capacity_kg?.toLocaleString()} kg.`,
         });
       } else if (res.status === "REJECTED_OVER_ALLOCATION") {
+        const available = res.remaining_capacity_kg ?? 0;
+        const excess = Math.max(0, targetKg - available);
         setNotification({
           type: "warning",
-          msg: `Claim '${res.claim_id}' REJECTED: Requested ${targetKg.toLocaleString()} kg exceeds remaining balance (${res.remaining_capacity_kg?.toLocaleString()} kg). Balance unchanged!`,
+          title: "Atomic Over-Allocation Rejected (Invariant Enforced)",
+          msg: `Attempted claim of ${targetKg.toLocaleString()} kg exceeds remaining recorded capacity (${available.toLocaleString()} kg) by ${excess.toLocaleString()} kg. Smart contract execution halted. Balance preserved!`,
+          details: { attemptedKg: targetKg, availableKg: available, excessKg: excess },
         });
       }
       await fetchAllowance();
@@ -141,10 +168,15 @@ export const ClaimLedgerScreen: React.FC<{ activePlotId?: string }> = ({
     try {
       const res = await releaseClaim(cid, "Shipment transport cancelled by buyer at port");
       setClaimsHistory((prev) =>
-        prev.map((c) => (c.claim_id === cid ? { ...c, message: "Released on-chain (capacity restored)" } : c))
+        prev.map((c) =>
+          c.claim_id === cid
+            ? { ...c, status: "RELEASED", message: "Released on-chain (capacity restored)" }
+            : c
+        )
       );
       setNotification({
         type: "success",
+        title: "Claim Capacity Released",
         msg: `Claim '${cid}' released on-chain! Capacity restored to ${res.remaining_capacity_kg?.toLocaleString()} kg.`,
       });
       await fetchAllowance();
@@ -155,264 +187,396 @@ export const ClaimLedgerScreen: React.FC<{ activePlotId?: string }> = ({
     }
   };
 
+  // Capacity calculations
+  const totalCeiling = allowance?.approved_allowance_kg || 0;
+  const netClaimed = allowance?.claimed_kg || 0;
+  const percentUsed = totalCeiling > 0 ? Math.min(100, (netClaimed / totalCeiling) * 100) : 0;
+
   return (
     <div className="space-y-6">
-      {/* Overview & Invariant banner */}
-      <div className="bg-white p-6 rounded-lg border border-[#e2e8e0] shadow-sm">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-bold text-[#081c15] tracking-tight">
-              On-Chain Claim Ledger &amp; Allowance Invariant
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-[#DCE5DE]">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-bold tracking-tight text-[#172820]">
+              Claim Ledger
             </h2>
-            <p className="text-sm text-slate-600 mt-1">
-              Maintains an immutable shared balance. Prevents double-claiming across buyers atomically without corrupting the balance.
-            </p>
-          </div>
-          <div className="flex flex-col items-end gap-1.5">
-            <span className="text-xs bg-slate-100 text-slate-700 px-3 py-1 rounded font-mono font-semibold">
-              INVARIANT: AcceptedClaims - Releases &le; ApprovedCapacity
+            <span className="font-mono text-xs bg-[#103126] text-[#B6E986] px-2.5 py-0.5 rounded-full border border-[#237A57]">
+              Shared Invariant Protocol
             </span>
-            {chainStatus && (
-              <span
-                className={`text-[11px] px-2.5 py-0.5 rounded font-mono font-medium flex items-center gap-1.5 ${
-                  chainStatus.connected
-                    ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                    : "bg-slate-100 text-slate-600 border border-slate-200"
-                }`}
-                title={chainStatus.message}
-              >
-                <span
-                  className={`w-2 h-2 rounded-full ${
-                    chainStatus.connected ? "bg-emerald-500 animate-pulse" : "bg-slate-400"
-                  }`}
-                />
-                {chainStatus.mode === "LIVE_EVM"
-                  ? `EVM RPC Connected (Chain ID: ${chainStatus.chain_id}, Block #${chainStatus.block_number})`
-                  : `Deterministic Simulation Ledger (Standalone)`}
-              </span>
-            )}
           </div>
+          <p className="text-sm text-[#65756C] mt-1">
+            Inspect approved allowances, submitted claims, releases, and the shared quantity invariant.
+          </p>
         </div>
 
-        {error && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 text-red-800 rounded text-xs">
-            <strong>Error:</strong> {error}
-          </div>
-        )}
-        {notification && (
-          <div
-            className={`mt-4 p-3 rounded text-xs border ${
-              notification.type === "success"
-                ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-                : "bg-amber-50 border-amber-200 text-amber-800"
-            }`}
-          >
-            <strong>{notification.type === "success" ? "Transaction Confirmed: " : "Notice: "}</strong>
-            {notification.msg}
-          </div>
-        )}
+        {/* Network Indicator */}
+        <div className="flex items-center gap-2">
+          {chainStatus && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-white border border-[#DCE5DE] text-xs font-mono">
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  chainStatus.connected ? "bg-[#16805D] animate-pulse" : "bg-[#B7791F]"
+                }`}
+              />
+              <span className="font-semibold text-[#172820]">
+                {chainStatus.mode === "LIVE_EVM" ? "Hardhat EVM" : "Simulated Ledger"}
+              </span>
+              <span className="text-[#65756C]">Chain {chainStatus.chain_id || 31337}</span>
+            </div>
+          )}
+        </div>
+      </div>
 
-        {/* Plot Selector */}
-        <div className="mt-6 flex flex-wrap items-center gap-4 p-4 bg-[#f8faf9] rounded border border-[#e2e8e0]">
+      {/* Target Selector Toolbar */}
+      <div className="p-3.5 bg-white rounded-lg border border-[#DCE5DE] shadow-xs flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <div>
-            <label className="block text-xs font-semibold text-slate-700">Target Plot ID</label>
+            <label className="block text-[11px] font-semibold text-[#65756C]">Target Plot ID</label>
             <input
               type="text"
               value={plotId}
               onChange={(e) => setPlotId(e.target.value)}
-              className="mt-1 text-xs font-mono px-3 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-[#1b4332]"
+              className="mt-0.5 text-xs font-mono px-3 py-1.5 border border-[#DCE5DE] rounded-md bg-[#F5F7F4] focus:bg-white focus:border-[#237A57] outline-hidden"
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-700">Season Year</label>
+            <label className="block text-[11px] font-semibold text-[#65756C]">Season Year</label>
             <input
               type="number"
               value={seasonId}
               onChange={(e) => setSeasonId(Number(e.target.value))}
-              className="mt-1 text-xs font-mono px-3 py-1.5 border border-slate-300 rounded w-28 focus:ring-1 focus:ring-[#1b4332]"
+              className="mt-0.5 text-xs font-mono px-3 py-1.5 border border-[#DCE5DE] rounded-md bg-[#F5F7F4] focus:bg-white focus:border-[#237A57] outline-hidden w-24"
             />
           </div>
           <div className="pt-4">
             <button
               onClick={fetchAllowance}
-              className="px-3 py-1.5 text-xs font-semibold border border-slate-300 rounded hover:bg-slate-50 text-slate-700 transition"
+              disabled={loading}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#172820] bg-[#F5F7F4] hover:bg-[#DCE5DE] rounded-md transition cursor-pointer"
             >
-              Refresh State
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+              <span>Query Ledger</span>
             </button>
           </div>
         </div>
 
-        {/* Current Balance Display or Grant Allowance Form */}
-        <div className="mt-6">
-          {allowance ? (
-            <div className="p-5 bg-white border border-[#1b4332] rounded-lg shadow-sm">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div>
-                  <span className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Active Allowance</span>
-                  <h3 className="text-lg font-bold text-[#081c15] font-mono">{allowance.plot_id}</h3>
-                </div>
-                <div className="text-right">
-                  <span className="text-xs text-slate-500">Crop / Season:</span>
-                  <div className="font-semibold text-slate-800">{allowance.crop_code} | {allowance.season_id}</div>
-                </div>
-              </div>
+        <div className="text-right text-[11px] font-mono text-[#65756C]">
+          <span>Invariant: NetClaims &le; ApprovedCapacity</span>
+        </div>
+      </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 text-center">
-                <div className="p-3 bg-slate-50 rounded">
-                  <span className="text-xs text-slate-500">Approved Ceiling</span>
-                  <div className="text-lg font-bold text-slate-800 mt-1">
-                    {allowance.approved_allowance_kg.toLocaleString()} <span className="text-xs font-normal">kg</span>
-                  </div>
-                </div>
-                <div className="p-3 bg-slate-50 rounded">
-                  <span className="text-xs text-slate-500">Total Claimed</span>
-                  <div className="text-lg font-bold text-amber-700 mt-1">
-                    {allowance.claimed_kg.toLocaleString()} <span className="text-xs font-normal">kg</span>
-                  </div>
-                </div>
-                <div className="p-3 bg-slate-50 rounded">
-                  <span className="text-xs text-slate-500">Released Mass</span>
-                  <div className="text-lg font-bold text-blue-700 mt-1">
-                    {allowance.releasedKg.toLocaleString()} <span className="text-xs font-normal">kg</span>
-                  </div>
-                </div>
-                <div className="p-3 bg-emerald-50 rounded border border-emerald-200">
-                  <span className="text-xs text-emerald-800 font-semibold">Remaining Capacity</span>
-                  <div className="text-lg font-bold text-[#1b4332] mt-1">
-                    {allowance.remaining_allowance_kg.toLocaleString()} <span className="text-xs font-normal">kg</span>
-                  </div>
-                </div>
+      {error && (
+        <div className="p-3 bg-[#B83A3A]/10 border border-[#B83A3A]/25 rounded-md text-xs text-[#B83A3A] flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* Notification Banner (with Detailed Over-Allocation Info) */}
+      {notification && (
+        <div
+          className={`p-4 rounded-lg border text-xs space-y-1.5 ${
+            notification.type === "success"
+              ? "bg-[#16805D]/10 border-[#16805D]/30 text-[#16805D]"
+              : "bg-[#B7791F]/10 border-[#B7791F]/30 text-[#B7791F]"
+          }`}
+        >
+          <div className="flex items-center gap-2 font-bold text-sm">
+            {notification.type === "success" ? (
+              <CheckCircle2 className="w-4 h-4" />
+            ) : (
+              <AlertTriangle className="w-4 h-4" />
+            )}
+            <span>{notification.title}</span>
+          </div>
+          <p className="leading-relaxed">{notification.msg}</p>
+          {notification.details && (
+            <div className="mt-2 p-2.5 bg-white/80 rounded border border-current/20 font-mono text-[11px] grid grid-cols-3 gap-2 text-center text-[#172820]">
+              <div>
+                <span className="text-[#65756C] block">Attempted Amount</span>
+                <span className="font-bold text-[#B83A3A] tabular-nums">
+                  {notification.details.attemptedKg.toLocaleString()} kg
+                </span>
               </div>
-            </div>
-          ) : (
-            <div className="p-5 bg-amber-50/60 border border-amber-200 rounded-lg">
-              <h4 className="text-sm font-bold text-amber-900">No Allowance Registered for this Plot &amp; Season</h4>
-              <p className="text-xs text-amber-800 mt-1">
-                Before submitting shipment claims, an authorized authority must register the approved mass ceiling for {plotId}.
-              </p>
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <input
-                  type="number"
-                  value={grantApprovedKg}
-                  onChange={(e) => setGrantApprovedKg(Number(e.target.value))}
-                  placeholder="Allowance (kg)"
-                  className="text-xs font-mono px-3 py-1.5 border border-slate-300 rounded bg-white w-36"
-                />
-                <input
-                  type="text"
-                  value={grantCropCode}
-                  onChange={(e) => setGrantCropCode(e.target.value)}
-                  placeholder="Crop Code"
-                  className="text-xs font-mono px-3 py-1.5 border border-slate-300 rounded bg-white w-24"
-                />
-                <button
-                  onClick={handleGrantAllowance}
-                  disabled={loading}
-                  className="px-4 py-1.5 text-xs font-semibold rounded bg-[#1b4332] hover:bg-[#2d6a4f] text-white transition disabled:opacity-50"
-                >
-                  {loading ? "Registering..." : `Grant ${grantApprovedKg.toLocaleString()} kg Allowance`}
-                </button>
+              <div>
+                <span className="text-[#65756C] block">Available Ceiling</span>
+                <span className="font-bold text-[#237A57] tabular-nums">
+                  {notification.details.availableKg.toLocaleString()} kg
+                </span>
+              </div>
+              <div>
+                <span className="text-[#65756C] block">Excess Rejected</span>
+                <span className="font-bold text-[#B7791F] tabular-nums">
+                  +{notification.details.excessKg.toLocaleString()} kg
+                </span>
               </div>
             </div>
           )}
         </div>
+      )}
 
-        {/* Shipment Claim Interactive Controls */}
-        {allowance && (
-          <div className="mt-8 border-t border-slate-200 pt-6">
-            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-              Submit Shipment Claim Transaction
-            </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Demonstrates atomic double-allocation rejection. Claim 1 (1,800 kg) succeeds; subsequent Claim 2 (2,000 kg) is rejected without mutating balance.
-            </p>
-
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">Claim ID / BOL</label>
-                <input
-                  type="text"
-                  value={claimId}
-                  onChange={(e) => setClaimId(e.target.value)}
-                  className="mt-1 w-full text-xs font-mono px-3 py-1.5 border border-slate-300 rounded"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">Claim Mass (kg)</label>
-                <input
-                  type="number"
-                  value={claimKg}
-                  onChange={(e) => setClaimKg(Number(e.target.value))}
-                  className="mt-1 w-full text-xs font-mono px-3 py-1.5 border border-slate-300 rounded"
-                />
-              </div>
-              <div className="flex items-end gap-2">
-                <button
-                  onClick={() => handleSubmitClaim()}
-                  disabled={loading}
-                  className="w-full py-2 text-xs font-semibold rounded bg-[#1b4332] hover:bg-[#2d6a4f] text-white transition disabled:opacity-50"
-                >
-                  Submit Custom Claim
-                </button>
+      {/* Main Allowance & Invariant Summary Panel */}
+      {allowance ? (
+        <div className="bg-white p-6 rounded-lg border border-[#DCE5DE] shadow-xs space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#DCE5DE] pb-4">
+            <div>
+              <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-[#65756C]">
+                Active Production Allowance
+              </span>
+              <h3 className="text-xl font-bold text-[#172820] font-mono mt-0.5">
+                {allowance.plot_id}
+              </h3>
+            </div>
+            <div className="text-right">
+              <span className="text-xs text-[#65756C]">Crop &bull; Season:</span>
+              <div className="font-semibold text-sm text-[#172820] font-mono">
+                {allowance.crop_code} &bull; Season {allowance.season_id}
               </div>
             </div>
+          </div>
 
-            {/* Quick Scenario Preset Buttons */}
-            <div className="mt-4 flex flex-wrap gap-3">
+          {/* Metric Cards Strip with Tabular Numerals */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="p-4 bg-[#F5F7F4] rounded-lg border border-[#DCE5DE]">
+              <span className="text-xs text-[#65756C] font-medium">Approved Allowance</span>
+              <div className="text-xl font-bold text-[#172820] font-mono tabular-nums mt-1">
+                {allowance.approved_allowance_kg.toLocaleString()} <span className="text-xs font-normal text-[#65756C]">kg</span>
+              </div>
+              <div className="text-[10px] text-[#65756C] mt-1">Authorized harvest ceiling</div>
+            </div>
+
+            <div className="p-4 bg-[#F5F7F4] rounded-lg border border-[#DCE5DE]">
+              <span className="text-xs text-[#65756C] font-medium">Total Claimed</span>
+              <div className="text-xl font-bold text-[#B7791F] font-mono tabular-nums mt-1">
+                {allowance.claimed_kg.toLocaleString()} <span className="text-xs font-normal text-[#65756C]">kg</span>
+              </div>
+              <div className="text-[10px] text-[#65756C] mt-1">Recorded shipment mass</div>
+            </div>
+
+            <div className="p-4 bg-[#F5F7F4] rounded-lg border border-[#DCE5DE]">
+              <span className="text-xs text-[#65756C] font-medium">Released Quantity</span>
+              <div className="text-xl font-bold text-[#237A57] font-mono tabular-nums mt-1">
+                {allowance.releasedKg.toLocaleString()} <span className="text-xs font-normal text-[#65756C]">kg</span>
+              </div>
+              <div className="text-[10px] text-[#65756C] mt-1">Restored to capacity</div>
+            </div>
+
+            <div className="p-4 bg-[#16805D]/10 rounded-lg border border-[#16805D]/30">
+              <span className="text-xs font-semibold text-[#16805D]">Remaining Capacity</span>
+              <div className="text-xl font-bold text-[#16805D] font-mono tabular-nums mt-1">
+                {allowance.remaining_allowance_kg.toLocaleString()} <span className="text-xs font-normal">kg</span>
+              </div>
+              <div className="text-[10px] text-[#16805D] mt-1">Available for claims</div>
+            </div>
+          </div>
+
+          {/* Visual Invariant Progress Bar */}
+          <div className="space-y-1.5 pt-2">
+            <div className="flex justify-between text-xs font-mono">
+              <span className="text-[#65756C]">Capacity Utilization: {percentUsed.toFixed(1)}%</span>
+              <span className="font-semibold text-[#172820]">
+                {netClaimed.toLocaleString()} / {totalCeiling.toLocaleString()} kg
+              </span>
+            </div>
+            <div className="w-full h-3 bg-[#F5F7F4] rounded-full overflow-hidden border border-[#DCE5DE]">
+              <div
+                className={`h-full transition-all duration-300 rounded-full ${
+                  percentUsed >= 100
+                    ? "bg-[#B83A3A]"
+                    : percentUsed > 75
+                    ? "bg-[#B7791F]"
+                    : "bg-[#237A57]"
+                }`}
+                style={{ width: `${percentUsed}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Contract Hash Provenance */}
+          <div className="pt-2 flex flex-wrap items-center justify-between text-[11px] font-mono text-[#65756C] border-t border-[#DCE5DE]">
+            <span className="truncate max-w-sm">Allowance Tx: {allowance.tx_hash}</span>
+            <span>Anchor: SilvaPassRegistry.sol</span>
+          </div>
+        </div>
+      ) : (
+        /* Grant Allowance State */
+        <div className="bg-white p-6 rounded-lg border border-dashed border-[#B7791F]/50 shadow-xs space-y-4">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-5 h-5 text-[#B7791F]" />
+            <h4 className="text-base font-bold text-[#172820]">
+              No Allowance Registered for {plotId} (Season {seasonId})
+            </h4>
+          </div>
+          <p className="text-xs text-[#65756C] max-w-xl">
+            Before shipment claims can be submitted, an authorized certifying authority must grant and anchor an initial production allowance ceiling on-chain.
+          </p>
+          <div className="flex flex-wrap items-center gap-3 pt-2">
+            <div>
+              <label className="block text-[11px] font-semibold text-[#65756C]">Ceiling Mass (kg)</label>
+              <input
+                type="number"
+                value={grantApprovedKg}
+                onChange={(e) => setGrantApprovedKg(Number(e.target.value))}
+                className="mt-0.5 text-xs font-mono px-3 py-1.5 border border-[#DCE5DE] rounded-md bg-[#F5F7F4] focus:bg-white w-36"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-[#65756C]">Crop Code</label>
+              <input
+                type="text"
+                value={grantCropCode}
+                onChange={(e) => setGrantCropCode(e.target.value)}
+                className="mt-0.5 text-xs font-mono px-3 py-1.5 border border-[#DCE5DE] rounded-md bg-[#F5F7F4] focus:bg-white w-24"
+              />
+            </div>
+            <div className="pt-4">
               <button
-                onClick={() => handleSubmitClaim(1800, `CLAIM-VALID-1800-${Date.now().toString().slice(-4)}`)}
+                onClick={handleGrantAllowance}
                 disabled={loading}
-                className="px-3 py-1.5 text-xs font-semibold rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 transition"
+                className="px-4 py-1.5 text-xs font-semibold rounded-md bg-[#237A57] hover:bg-[#103126] text-white transition shadow-xs cursor-pointer disabled:opacity-50"
               >
-                1. Submit Valid Claim (1,800 kg)
-              </button>
-              <button
-                onClick={() => handleSubmitClaim(2000, `CLAIM-OVER-ALLOC-2000-${Date.now().toString().slice(-4)}`)}
-                disabled={loading}
-                className="px-3 py-1.5 text-xs font-semibold rounded bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 transition"
-              >
-                2. Attempt Over-Allocation (2,000 kg)
+                {loading ? "Registering..." : `Grant ${grantApprovedKg.toLocaleString()} kg Ceiling`}
               </button>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Recent Transaction Log */}
-        {claimsHistory.length > 0 && (
-          <div className="mt-8 border-t border-slate-200 pt-6">
-            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-              On-Chain Claim Activity Log
-            </h3>
-            <div className="mt-3 border border-slate-200 rounded overflow-hidden divide-y divide-slate-100 text-xs">
-              {claimsHistory.map((c) => (
-                <div key={c.claim_id} className="p-3 flex items-center justify-between hover:bg-slate-50 transition">
-                  <div>
-                    <div className="font-semibold text-slate-800 font-mono flex items-center gap-2">
-                      <span>{c.claim_id}</span>
+      {/* Claim Submission & Double-Claim Invariant Simulation */}
+      {allowance && (
+        <div className="bg-white p-6 rounded-lg border border-[#DCE5DE] shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-[#DCE5DE] pb-3">
+            <div>
+              <h3 className="text-base font-bold text-[#172820]">Submit Shipment Claim</h3>
+              <p className="text-xs text-[#65756C]">
+                Execute on-chain claim against recorded plot allowance. Atomic invariant rejects excess allocations.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+            <div>
+              <label className="block text-[11px] font-semibold text-[#172820]">
+                Claim Identifier / BOL
+              </label>
+              <input
+                type="text"
+                value={claimId}
+                onChange={(e) => setClaimId(e.target.value)}
+                className="mt-1 w-full text-xs font-mono px-3 py-1.5 border border-[#DCE5DE] rounded-md bg-[#F5F7F4] focus:bg-white focus:border-[#237A57] outline-hidden"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-[#172820]">
+                Claim Mass (kg)
+              </label>
+              <input
+                type="number"
+                value={claimKg}
+                onChange={(e) => setClaimKg(Number(e.target.value))}
+                className="mt-1 w-full text-xs font-mono px-3 py-1.5 border border-[#DCE5DE] rounded-md bg-[#F5F7F4] focus:bg-white focus:border-[#237A57] outline-hidden tabular-nums"
+              />
+            </div>
+            <div className="flex items-end">
+              <button
+                onClick={() => handleSubmitClaim()}
+                disabled={loading}
+                className="w-full py-2 px-3 text-xs font-semibold text-white bg-[#237A57] hover:bg-[#103126] rounded-md transition shadow-xs cursor-pointer disabled:opacity-50"
+              >
+                {loading ? "Submitting..." : "Submit Claim"}
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Preset Buttons */}
+          <div className="pt-2 flex flex-wrap items-center gap-3">
+            <span className="text-xs font-medium text-[#65756C]">Quick Scenarios:</span>
+            <button
+              onClick={() =>
+                handleSubmitClaim(1800, `CLAIM-VALID-1800-${Date.now().toString().slice(-4)}`)
+              }
+              disabled={loading}
+              className="px-3 py-1.5 text-xs font-semibold rounded-md bg-[#16805D]/10 hover:bg-[#16805D]/20 text-[#16805D] border border-[#16805D]/30 transition cursor-pointer"
+            >
+              1. Submit Valid Claim (1,800 kg)
+            </button>
+            <button
+              onClick={() =>
+                handleSubmitClaim(2000, `CLAIM-OVER-ALLOC-2000-${Date.now().toString().slice(-4)}`)
+              }
+              disabled={loading}
+              className="px-3 py-1.5 text-xs font-semibold rounded-md bg-[#B7791F]/10 hover:bg-[#B7791F]/20 text-[#B7791F] border border-[#B7791F]/30 transition cursor-pointer"
+            >
+              2. Test Over-Allocation Rejection (2,000 kg)
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Claim Activity Ledger Table */}
+      {claimsHistory.length > 0 && (
+        <div className="bg-white p-5 rounded-lg border border-[#DCE5DE] shadow-xs space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-bold text-[#172820]">On-Chain Claim History</h3>
+              <p className="text-xs text-[#65756C]">
+                Immutable transactions anchoring shipment quantities against plot allowances.
+              </p>
+            </div>
+            <span className="text-xs font-mono text-[#65756C]">
+              {claimsHistory.length} recorded events
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-[#DCE5DE] text-[#65756C] font-mono uppercase text-[10px]">
+                  <th className="py-2.5 px-3">Claim Identifier</th>
+                  <th className="py-2.5 px-3">Quantity</th>
+                  <th className="py-2.5 px-3">Status</th>
+                  <th className="py-2.5 px-3">Transaction Receipt</th>
+                  <th className="py-2.5 px-3">Outcome Message</th>
+                  <th className="py-2.5 px-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#DCE5DE]/60">
+                {claimsHistory.map((c) => (
+                  <tr key={c.claim_id} className="hover:bg-[#F5F7F4] transition">
+                    <td className="py-2.5 px-3 font-mono font-semibold text-[#172820]">
+                      {c.claim_id}
+                    </td>
+                    <td className="py-2.5 px-3 font-mono font-bold tabular-nums text-[#172820]">
+                      {c.claimed_kg.toLocaleString()} kg
+                    </td>
+                    <td className="py-2.5 px-3">
                       <StatusBadge status={c.status} />
-                    </div>
-                    <div className="text-[11px] text-slate-500 mt-0.5">
-                      Mass: <strong>{c.claimed_kg.toLocaleString()} kg</strong> | Tx: <span className="font-mono">{c.tx_hash?.slice(0, 18)}...</span>
-                    </div>
-                    <p className="text-[11px] text-slate-600 mt-0.5">{c.message}</p>
-                  </div>
-                  <div>
-                    {c.status === "CONFIRMED" && (
-                      <button
-                        onClick={() => handleReleaseClaim(c.claim_id)}
-                        disabled={loading}
-                        className="px-2.5 py-1 text-xs border border-red-300 rounded text-red-700 hover:bg-red-50 font-medium transition"
-                      >
-                        Release Claim
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-[11px] text-[#65756C] truncate max-w-[140px]">
+                      {c.tx_hash || "—"}
+                    </td>
+                    <td className="py-2.5 px-3 text-xs text-[#65756C] max-w-xs truncate">
+                      {c.message}
+                    </td>
+                    <td className="py-2.5 px-3 text-right">
+                      {c.status === "CONFIRMED" && (
+                        <button
+                          onClick={() => handleReleaseClaim(c.claim_id)}
+                          disabled={loading}
+                          className="px-2.5 py-1 text-[11px] font-semibold border border-[#B83A3A]/40 rounded text-[#B83A3A] hover:bg-[#B83A3A]/10 transition cursor-pointer"
+                        >
+                          Release Capacity
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
