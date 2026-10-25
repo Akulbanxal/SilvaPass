@@ -133,21 +133,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             {onOpenConsole && (
               <button
                 onClick={onOpenConsole}
-                className="px-3 py-1.5 rounded-xl bg-[#10251C] border border-[#1b4332] text-[#80DDB0] hover:text-[#F2F5ED] hover:border-[#80DDB0] transition text-xs font-mono font-semibold flex items-center gap-1.5 cursor-pointer"
+                className="px-3.5 py-1.5 rounded-xl bg-[#10251C] border border-[#80DDB0]/60 text-[#B7ED78] hover:text-[#F2F5ED] hover:bg-[#163327] hover:border-[#B7ED78] transition text-xs font-mono font-semibold flex items-center gap-1.5 cursor-pointer shadow-forest-glow"
                 title="Open the 7-screen live protocol operational console"
               >
                 <Terminal className="w-3.5 h-3.5" />
-                Console
+                Launch Console
+                <ChevronRight className="w-3.5 h-3.5" />
               </button>
             )}
-
-            <button
-              onClick={() => scrollToSection("integrity-protocol")}
-              className="px-3.5 py-1.5 rounded-xl bg-[#B7ED78] text-[#07130F] font-bold text-xs uppercase tracking-wider font-mono hover:bg-[#80DDB0] transition flex items-center gap-1 cursor-pointer shadow-forest-glow"
-            >
-              Explore
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
           </div>
 
           {/* Mobile Menu Toggle Button */}
@@ -244,10 +237,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             {/* Action Buttons */}
             <div className="flex flex-wrap items-center gap-3 pt-1">
               <button
-                onClick={() => scrollToSection("integrity-protocol")}
+                onClick={onOpenConsole || (() => scrollToSection("integrity-protocol"))}
                 className="px-6 sm:px-7 py-3 rounded-xl bg-[#B7ED78] text-[#07130F] font-bold text-xs uppercase tracking-wider font-mono hover:bg-[#80DDB0] transition flex items-center gap-2 cursor-pointer shadow-forest-glow hover:scale-[1.02] active:scale-[0.98]"
               >
-                Explore the Protocol
+                Launch Protocol Console
                 <ArrowRight className="w-4 h-4" />
               </button>
 

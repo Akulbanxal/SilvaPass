@@ -15,8 +15,16 @@ type ViewMode = "landing" | "console";
 
 export function App() {
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    if (typeof window !== "undefined" && (window.location.hash.includes("console") || window.location.search.includes("console"))) {
-      return "console";
+    if (typeof window !== "undefined") {
+      const hash = window.location.hash.toLowerCase();
+      const search = window.location.search.toLowerCase();
+      if (
+        hash.includes("console") ||
+        search.includes("console") ||
+        ["overview", "plots", "reviews", "ledger", "documents", "environmental", "evidence"].some(t => hash.includes(t))
+      ) {
+        return "console";
+      }
     }
     return "landing";
   });
