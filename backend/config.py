@@ -36,8 +36,20 @@ class Settings(BaseSettings):
 
     # Document Extraction
     EXTRACTION_MODE: str = Field(default="MOCK", description="Extraction mode: MOCK or LIVE")
-    LLM_API_KEY: str = Field(default="", description="LLM provider API key")
+    LLM_PROVIDER: str = Field(default="openai", description="LLM provider: openai")
+    OPENAI_API_KEY: str = Field(default="", description="OpenAI API key")
+    LLM_API_KEY: str = Field(default="", description="LLM provider API key (fallback)")
     LLM_MODEL: str = Field(default="gpt-4o-mini", description="LLM model identifier")
+
+    def get_llm_api_key(self) -> str:
+        import os
+        return (
+            os.environ.get("OPENAI_API_KEY")
+            or self.OPENAI_API_KEY
+            or os.environ.get("LLM_API_KEY")
+            or self.LLM_API_KEY
+            or ""
+        ).strip()
 
     model_config = SettingsConfigDict(
         env_file=".env",

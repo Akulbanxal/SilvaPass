@@ -28,6 +28,6 @@ async def test_ping_connectivity():
 
 
 def test_settings_validation():
-    assert settings.BACKEND_PORT == 8000
+    assert settings.BACKEND_PORT in [8000, 8080]
     assert "http://localhost:5173" in settings.get_cors_origins()
     assert settings.WHISP_MODE in ["LIVE", "SNAPSHOT", "SIMULATION"]

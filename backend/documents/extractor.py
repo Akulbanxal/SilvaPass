@@ -337,13 +337,27 @@ class RuleBasedExtractionProvider(DocumentExtractionProvider):
         return fields, round(confidence, 2), "RULE_BASED_EXTRACTOR", warnings
 
 
+def _sanitize_error_message(msg: str, key_to_mask: Optional[str] = None) -> str:
+    """Removes API keys, Bearer tokens, and credential fragments from error strings."""
+    if not msg:
+        return "Unknown error"
+    clean = str(msg)
+    if key_to_mask and len(key_to_mask) > 4:
+        clean = clean.replace(key_to_mask, "[REDACTED_API_KEY]")
+    # Mask any sk-... token patterns (OpenAI keys)
+    clean = re.sub(r"sk-[a-zA-Z0-9_\-]{8,}", "[REDACTED_API_KEY]", clean)
+    # Mask Authorization Bearer tokens
+    clean = re.sub(r"Bearer\s+[a-zA-Z0-9_\-\.]+", "Bearer [REDACTED]", clean, flags=re.IGNORECASE)
+    return clean
+
+
 class OpenAIExtractionProvider(DocumentExtractionProvider):
     """
     HTTP client calling OpenAI API format with strict schema parsing.
     Passes untrusted document text in user role with protective system boundary.
     """
     def __init__(self, api_key: str, model: str = "gpt-4o-mini", base_url: str = "https://api.openai.com/v1"):
-        self.api_key = api_key
+        self.api_key = api_key.strip()
         self.model = model
         self.base_url = base_url.rstrip("/")
 
@@ -369,7 +383,21 @@ class OpenAIExtractionProvider(DocumentExtractionProvider):
         async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.post(f"{self.base_url}/chat/completions", json=body, headers=headers)
             if resp.status_code != 200:
-                raise RuntimeError(f"OpenAI API error {resp.status_code}: {resp.text}")
+                detail = ""
+                try:
+                    err_json = resp.json()
+                    detail = err_json.get("error", {}).get("message", resp.text)
+                except Exception:
+                    detail = resp.text
+                sanitized_detail = _sanitize_error_message(detail, self.api_key)
+                if resp.status_code == 401:
+                    raise RuntimeError(f"OpenAI Authentication Failed (HTTP 401): {sanitized_detail}")
+                elif resp.status_code == 429:
+                    raise RuntimeError(f"OpenAI Rate Limit or Quota Exceeded (HTTP 429): {sanitized_detail}")
+                elif resp.status_code == 404:
+                    raise RuntimeError(f"OpenAI Model or Resource Not Found (HTTP 404): {sanitized_detail}")
+                else:
+                    raise RuntimeError(f"OpenAI API error {resp.status_code}: {sanitized_detail}")
 
             result_json = resp.json()
             content = result_json["choices"][0]["message"]["content"]
@@ -409,8 +437,8 @@ class DocumentExtractor:
 
     def _resolve_default_provider(self) -> DocumentExtractionProvider:
         # Check if live LLM credentials are configured
-        llm_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("LLM_API_KEY") or settings.LLM_API_KEY
-        if settings.EXTRACTION_MODE == "LIVE" and llm_key and llm_key.strip():
+        llm_key = settings.get_llm_api_key()
+        if settings.EXTRACTION_MODE == "LIVE" and llm_key:
             logger.info("Initializing OpenAI-compatible LLM extraction provider.")
             return OpenAIExtractionProvider(api_key=llm_key, model=settings.LLM_MODEL)
         else:
@@ -433,11 +461,12 @@ class DocumentExtractor:
         try:
             fields, confidence, source, warnings = await selected_provider.extract(file_name, raw_text)
         except Exception as e:
-            logger.warning(f"Active provider extraction failed ({e}), falling back to RuleBasedExtractionProvider.")
+            sanitized_err = _sanitize_error_message(str(e), getattr(selected_provider, "api_key", None))
+            logger.warning(f"Active provider extraction failed ({sanitized_err}), falling back to RuleBasedExtractionProvider.")
             fallback = RuleBasedExtractionProvider()
             fields, confidence, source, warnings = await fallback.extract(file_name, raw_text)
-            source = f"RULE_BASED_FALLBACK (Primary provider failed: {str(e)[:60]})"
-            warnings.append(f"AI provider connection failed: {str(e)[:80]}. Extracted via deterministic fallback.")
+            source = f"RULE_BASED_FALLBACK (Primary provider failed: {sanitized_err[:80]})"
+            warnings.append(f"AI provider connection failed: {sanitized_err[:100]}. Extracted via deterministic fallback.")
 
         # Business rule validation: flag missing plot or missing quantity
         if not fields.referenced_plot_id:
