@@ -149,7 +149,17 @@ Navigate to `http://localhost:5173` to interact with the full protocol interface
 
 ---
 
-## 7. FAO Open Foris WHISP Integration & Provenance
+## 7. Cloud Deployment (Vercel, Netlify, Render, Railway)
+
+SilvaPass includes out-of-the-box configuration manifests for instant cloud hosting:
+- **Frontend (Vercel / Netlify)**: Pre-configured SPA routing via [`vercel.json`](vercel.json) and [`netlify.toml`](netlify.toml).
+- **Backend (Render / Railway)**: Pre-configured Python service via [`render.yaml`](render.yaml), [`railway.toml`](railway.toml), and [`Procfile`](Procfile).
+
+For the full step-by-step setup walkthrough and environment variables reference, see **[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)**.
+
+---
+
+## 8. FAO Open Foris WHISP Integration & Provenance
 
 SilvaPass integrates with **FAO Open Foris WHISP** (*"What is in that plot?"*) to perform multi-map convergence-of-evidence deforestation risk screenings relative to the December 31, 2020 cutoff date.
 

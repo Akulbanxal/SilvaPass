@@ -1,5 +1,5 @@
 {
-  "timestamp_utc": "2026-10-17T03:54:19Z",
+  "timestamp_utc": "2026-10-25T19:38:30Z",
   "protocol": "SilvaPass EUDR Compliance Ledger",
   "overall_evaluation_passed": true,
   "evaluation_a_geospatial_identity": {
@@ -200,7 +200,7 @@
     "evaluation_name": "Evaluation B: Smart Contract Invariants",
     "passed": true,
     "return_code": 0,
-    "duration_seconds": 1.04,
+    "duration_seconds": 7.57,
     "tests_passing": 14,
     "total_invariants_asserted": 7,
     "invariants": [
@@ -241,12 +241,12 @@
       }
     ],
     "output_snippet": [
-      "      \u2714 should revoke plot and block any subsequent claims",
+      "      \u00e2\u02c6\u0161 should revoke plot and block any subsequent claims",
       "    5. Randomized Sequence Invariant Property Test",
-      "      \u2714 maintains the invariant (netClaimed <= approvedAllowanceKg) across 30 randomized operations",
+      "      \u00e2\u02c6\u0161 maintains the invariant (netClaimed <= approvedAllowanceKg) across 30 randomized operations (185ms)",
       "",
       "",
-      "  14 passing (377ms)"
+      "  14 passing (2s)"
     ]
   },
   "evaluation_c_document_extraction": {
@@ -317,7 +317,7 @@
           "shipment_quantity"
         ],
         "warnings": [
-          "Multiple competing net weight declarations found: ['1800', '2400']"
+          "Multiple competing net weight declarations found: ['2400', '1800']"
         ]
       },
       {
@@ -353,7 +353,7 @@
     "evaluation_name": "Evaluation D: Fault Handling & Boundary Defense",
     "passed": true,
     "return_code": 0,
-    "duration_seconds": 0.74,
+    "duration_seconds": 18.4,
     "fault_scenarios_verified": 10,
     "scenarios": [
       {

@@ -222,7 +222,7 @@ def run_evaluation_b() -> Dict[str, Any]:
     start_time = time.time()
     contracts_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "contracts"))
 
-    cmd = ["npx", "hardhat", "test"]
+    cmd = ["npx.cmd" if sys.platform == "win32" else "npx", "hardhat", "test"]
     try:
         proc = subprocess.run(
             cmd,
@@ -230,6 +230,7 @@ def run_evaluation_b() -> Dict[str, Any]:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            shell=(sys.platform == "win32"),
             timeout=120
         )
         duration_s = round(time.time() - start_time, 2)
@@ -418,7 +419,7 @@ def run_evaluation_d() -> Dict[str, Any]:
         "backend/tests/test_api_endpoints.py"
     ]
 
-    cmd = ["pytest", "-v"] + test_targets
+    cmd = [sys.executable, "-m", "pytest", "-v"] + test_targets
     env = os.environ.copy()
     env["PYTHONPATH"] = "."
 

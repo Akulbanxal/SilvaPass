@@ -12,7 +12,8 @@ import type {
   ReviewStatus,
 } from "../types";
 
-const BASE_URL = import.meta.env.VITE_BACKEND_API_URL || "http://127.0.0.1:8000";
+const RAW_BASE_URL = import.meta.env.VITE_BACKEND_API_URL || "http://127.0.0.1:8080";
+const BASE_URL = RAW_BASE_URL.replace(/\/+$/, "");
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${BASE_URL}${endpoint}`;

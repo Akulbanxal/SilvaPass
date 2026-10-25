@@ -22,6 +22,16 @@ async def lifespan(app: FastAPI):
     logger.info("Database URL: %s", settings.DATABASE_URL)
     logger.info("WHISP screening mode: %s", settings.WHISP_MODE)
     logger.info("Extraction mode: %s", settings.EXTRACTION_MODE)
+    try:
+        from backend.api.v1_router import db_manager
+        plots = db_manager.get_all_plots()
+        if len(plots) == 0:
+            logger.info("Empty database detected. Initializing demo dataset for cloud showcase...")
+            from scripts.seed_demo_scenario import seed_demo_environment
+            seed_demo_environment(db_path=db_manager.db_path, reset=False)
+            logger.info("Demo dataset seeded successfully.")
+    except Exception as e:
+        logger.warning("Auto-seed check encountered non-fatal error: %s", e)
     yield
     logger.info("SilvaPass backend shutting down")
 
@@ -34,12 +44,16 @@ app = FastAPI(
 )
 
 # CORS configuration
+cors_origins = settings.get_cors_origins()
+allow_all = "*" in cors_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.get_cors_origins(),
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+    allow_origins=["*"] if allow_all else cors_origins,
+    allow_origin_regex=r"^https://.*(vercel\.app|netlify\.app)$" if not allow_all else None,
+    allow_credentials=not allow_all,
+    allow_methods=["GET", "POST", "OPTIONS", "PUT", "DELETE"],
+    allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Accept"],
 )
 
 from fastapi import Request
@@ -100,10 +114,13 @@ async def connectivity_ping():
 
 
 if __name__ == "__main__":
+    import os
     import uvicorn
+    host = os.environ.get("HOST") or settings.BACKEND_HOST
+    port = settings.effective_port
     uvicorn.run(
         "backend.main:app",
-        host=settings.BACKEND_HOST,
-        port=settings.BACKEND_PORT,
+        host=host,
+        port=port,
         reload=(settings.ENVIRONMENT == "development")
     )

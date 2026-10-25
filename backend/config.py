@@ -13,10 +13,22 @@ class Settings(BaseSettings):
 
     BACKEND_HOST: str = Field(default="127.0.0.1", description="Host interface to bind")
     BACKEND_PORT: int = Field(default=8000, description="Port to listen on")
+    PORT: Union[int, None] = Field(default=None, description="Cloud provider port (Render/Railway)")
     ALLOWED_ORIGINS: Union[str, List[str]] = Field(
         default=["http://localhost:5173", "http://127.0.0.1:5173"],
         description="CORS allowed origins"
     )
+
+    @property
+    def effective_port(self) -> int:
+        import os
+        port_env = os.environ.get("PORT")
+        if port_env:
+            try:
+                return int(port_env)
+            except ValueError:
+                pass
+        return self.PORT or self.BACKEND_PORT
 
     DATABASE_URL: str = Field(default="sqlite:///./silvapass.db", description="Database connection URI")
 
